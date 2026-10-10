@@ -1,6 +1,6 @@
 {
   "name": "roomie",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "description": "Roomie 家庭协同小程序云函数（单函数多 action 分发）",
   "main": "index.js",
   "private": true,

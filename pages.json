@@ -17,6 +17,15 @@
 				"backgroundColor": "#E9F0F2"
 			}
 		},
+		// 用邀请码加入账本
+		{
+			"path": "pages/join-room/join-room",
+			"style": {
+				"navigationBarTitleText": "加入账本",
+				"navigationStyle": "custom",
+				"backgroundColor": "#E9F0F2"
+			}
+		},
 		{
 			      "path": "pages/report/bill-calendar",
 			      "style": {

@@ -1,7 +1,7 @@
 import type { AppConfig } from '@/types'
 
 /** 应用版本号（UI 展示与业务逻辑统一从此读取） */
-export const APP_VERSION = '2.1.7'
+export const APP_VERSION = '2.1.8'
 
 /** 带 v 前缀的版本文案，如 v2.0.0 */
 export function formatAppVersion(withPrefix = true) {

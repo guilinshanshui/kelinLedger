@@ -4,7 +4,7 @@
     <view class="page-header">
       <view class="header-row">
         <text class="header-sub">共 {{ rooms.length }} 个账本，点击卡片即可切换</text>
-        <view class="header-action" @click="onAddRoom">
+        <view class="header-action" @click="onCreateRoom">
           <text class="header-action-icon">+</text>
         </view>
       </view>
@@ -71,10 +71,16 @@
           </view>
         </view>
 
-        <!-- 添加账本 -->
-        <view class="add-card" @click="onAddRoom">
-          <text class="add-plus">+</text>
-          <text class="add-txt">添加账本</text>
+        <!-- 新建 / 加入账本：两个入口都摆在明面上，不用再猜邀请码往哪输 -->
+        <view class="add-row">
+          <view class="add-card" @click="onCreateRoom">
+            <AppIcon name="add" :size="22" />
+            <text class="add-txt">新建账本</text>
+          </view>
+          <view class="add-card" @click="onJoinRoom">
+            <AppIcon name="ticket" :size="22" />
+            <text class="add-txt">加入账本</text>
+          </view>
         </view>
       </view>
 
@@ -89,7 +95,7 @@
         <view class="invite-code-box">
           <text class="invite-code">{{ inviteCode || '------' }}</text>
         </view>
-        <text class="modal-hint">把邀请码发给家人或室友，让他们在「账本」页点「加入」输入即可</text>
+        <text class="modal-hint">把邀请码发给家人或室友，让他们在「账本」页点「加入账本」，输入这串码即可</text>
         <button class="action-btn primary modal-btn" @click="copyInviteCode">
           <text class="action-txt">复制邀请码</text>
         </button>
@@ -163,7 +169,8 @@ const onSwitchBook = (room) => {
   setTimeout(() => uni.switchTab({ url: '/pages/home/home' }), 300)
 }
 
-const onAddRoom = () => uni.navigateTo({ url: '/pages/create-room/create-room' })
+const onCreateRoom = () => uni.navigateTo({ url: '/pages/create-room/create-room' })
+const onJoinRoom = () => uni.navigateTo({ url: '/pages/join-room/join-room' })
 const onManage = (room) => {
   setCurrentRoom(room)
   uni.navigateTo({ url: `/pages/room-settings/room-settings?roomId=${room.id}` })
@@ -407,28 +414,29 @@ onShow(() => {
   color: var(--primary-color, #2F5D6B);
 }
 
-/* ---- 添加账本 ---- */
+/* ---- 新建 / 加入账本 ---- */
+.add-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
 .add-card {
+  flex: 1;
+  min-width: 0;
   height: 92px;
   border-radius: var(--radius-md, 12px);
   border: 1px dashed var(--text-faint, #CBD5E1);
-  background: #FFFFFF;
+  background: var(--bg-card, #FFFFFF);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
+  gap: 6px;
 }
 .add-card:active {
-  background: #FAFBFC;
-}
-.add-plus {
-  font-size: 28px;
-  color: var(--text-faint, #CBD5E1);
-  line-height: 1;
+  background: var(--bg-page, #FAFBFC);
 }
 .add-txt {
-  margin-top: 4px;
   font-size: 13px;
   color: var(--text-muted, #94A3B8);
 }

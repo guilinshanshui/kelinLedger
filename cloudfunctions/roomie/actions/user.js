@@ -6,7 +6,7 @@ const { optionalString, requireString } = require('../lib/validate')
 const { badRequest } = require('../lib/errors')
 const { cnParts, monthRange } = require('../lib/dates')
 
-const APP_VERSION = '2.1.7'
+const APP_VERSION = '2.1.8'
 
 const base64url = (buffer) =>
   buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -218,7 +218,8 @@ const VERSION_HISTORY = [
           '账本设置：资料、成员权限、邀请、转让、解散',
           '家庭清单与日程提醒',
           '资产账户与收支态势图',
-          '账单导入：支持微信 / 支付宝账单'
+          '账单导入：支持微信 / 支付宝账单',
+          '账本页新增「加入账本」入口，可用邀请码加入'
         ]
       },
       {
