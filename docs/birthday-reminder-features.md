@@ -1,8 +1,7 @@
 # 生日与提醒功能 · 本期更新说明
 
 > 更新周期：2026 年 6 月  
-> 适用版本：Roomie 小程序  
-> 关联设计文档：[reminder-roadmap.md](./reminder-roadmap.md)
+> 适用版本：可林记账本
 
 ---
 
@@ -80,7 +79,3 @@
 <img src="./birthday-reminder-features_files/微信图片_20260204104200_90_49.jpg" alt="首页 · 活跃空间" width="280" />
 
 <img src="./birthday-reminder-features_files/微信图片_20260204104831_91_49.jpg" alt="记一笔" width="280" />
-
-## 后续规划
-
-详见 [reminder-roadmap.md](./reminder-roadmap.md)（手机日历 → 微信订阅 → 邮件 → 短信/App 推送）。

@@ -1,6 +1,6 @@
 # 微信小程序部署前模拟验证教程
 
-适用于当前 `Roomie` 记账本项目。当前项目使用 Vue 3、uni-app Vue 3 + Vite、微信云开发和微信小程序原生 tabBar。
+适用于当前 `可林记账本` 项目。当前版本为 v2.1.9，使用 Vue 3、uni-app Vue 3 + Vite、微信云开发和微信小程序原生 tabBar。
 
 验证顺序：
 
@@ -75,7 +75,7 @@ npm run audit
 npm run test:cloud
 ```
 
-当前应通过 98 项业务断言，包括登录、建房、邀请、权限、记账、任务、动态、通知、预算、结算、周期账单、导入、转让和解散。
+当前应通过 110 项业务断言，失败 0 项，覆盖登录、建房、邀请、权限、记账、任务、动态、通知、账户余额、预算、结算、周期账单、导入、转让和解散等链路。
 
 校验微信构建产物：
 
@@ -202,7 +202,7 @@ export const appConfig: AppConfig = {
   cloudEnv: 'cloud1-xxxxxxxxxxxx',
   cloudFunctionName: 'roomie',
   appId: 'wx8ab87add7a9a0f11',
-  version: '2.1.0'
+  version: '2.1.9'
 }
 ```
 
@@ -404,7 +404,7 @@ async function main() {
 
   await ci.preview({
     project,
-    desc: 'Roomie pre-deploy preview',
+    desc: '可林记账本 2.1.9 pre-deploy preview',
     setting: {
       es6: true,
       minify: true
