@@ -1,6 +1,6 @@
 {
   "name": "roomie",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "description": "Roomie - 家庭协同小程序（微信云开发）",
   "private": true,
   "main": "main.js",

@@ -24,7 +24,13 @@
             :class="{ active: billSource === item.code }"
             @click="billSource = item.code"
           >
-            <image class="source-icon" :src="item.iconPath" mode="aspectFit" />
+            <view class="source-icon-box">
+              <AppIcon
+                :name="item.iconName"
+                :size="24"
+                :color="billSource === item.code ? '#FFFFFF' : ''"
+              />
+            </view>
             <text class="source-name">{{ item.name }}</text>
             <text class="source-hint">{{ item.hint }}</text>
           </view>
@@ -313,14 +319,14 @@ const sourceOptions = [
   {
     code: 'wechat',
     name: '微信支付',
-    iconPath: '/static/brand/wechat-pay.png',
+    iconName: 'wechat',
     hint: '微信官方账单',
     exportTip: '在微信里依次进入「我」「服务」「钱包」「账单」，点右上角菜单选导出账单'
   },
   {
     code: 'alipay',
     name: '支付宝',
-    iconPath: '/static/brand/alipay.png',
+    iconName: 'alipay',
     hint: '支付宝官方账单',
     exportTip: '在支付宝里依次进入「我的」「账单」，点右上角菜单选导出'
   }
@@ -691,9 +697,23 @@ const onNavBack = () => {
 }
 .source-card.active {
   border-color: var(--primary-color, #2F5D6B);
-  background: rgba(47, 93, 107, 0.04);
+  background: var(--primary-soft, #E9F0F2);
 }
-.source-icon { width: 36px; height: 36px; display: block; margin-bottom: 8px; border-radius: var(--radius-sm, 8px); }
+.source-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--primary-soft, #E9F0F2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+.source-card.active .source-icon-box {
+  background: var(--primary-color, #2F5D6B);
+  box-shadow: 0 6px 14px var(--primary-glow, rgba(47, 93, 107, 0.18));
+}
 .source-name { display: block; font-size: 15px; font-weight: 600; color: var(--text-ink, #0F172A); }
 .source-hint { display: block; font-size: 11px; color: var(--text-muted, #94A3B8); margin-top: 4px; }
 

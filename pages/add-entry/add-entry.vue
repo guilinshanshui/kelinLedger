@@ -530,7 +530,12 @@ const getMember = async () => {
       return
     }
     memberOptions.value = res.data.map(m => ({
-      icon: m.avatar, label: m.nickname, userId: m.userId, id: m.userId
+      avatar: m.avatar || '',
+      icon: m.avatar || 'mc:user-2',
+      nickname: m.nickname,
+      label: m.nickname,
+      userId: m.userId,
+      id: m.userId
     }));
     if (memberOptions.value.length === 0) {
       console.warn('[记一笔] 账本暂无成员，roomId =', roomId.value)

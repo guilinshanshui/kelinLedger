@@ -53,7 +53,14 @@
           >
             <view class="item-content">
               <!-- avatar 优先；其余图标交给 AppIcon，兼容 mc: 矢量 / 图片 / emoji -->
-              <image v-if="item.avatar" :src="item.avatar" mode="aspectFill" class="item-avatar" />
+              <UserAvatar
+                v-if="item.avatar"
+                :src="item.avatar"
+                :name="item.label || item.name || ''"
+                :size="44"
+                radius="14px"
+                class="item-avatar"
+              />
               <view v-else class="item-icon-wrap">
                 <AppIcon :value="item.icon" :size="24" />
               </view>
@@ -96,6 +103,7 @@ import { ref, watch, computed } from 'vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import { playSheetOpen, playSheetClose, sheetPanelTransition, sheetMaskTransition } from '@/common/utils/sheetMotion.js';
 import AppIcon from './AppIcon.vue';
+import UserAvatar from './UserAvatar.vue';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -296,7 +304,7 @@ const handleConfirm = () => {
   background: var(--primary-soft, #E9F0F2); border-radius: 22px; border: 2px solid transparent; transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
 }
 .item-content { display: flex; align-items: center; gap: 14px; }
-.item-avatar { width: 44px; height: 44px; border-radius: 14px; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+.item-avatar { border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 .item-icon-wrap { font-size: 20px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .item-label { font-size: 15px; font-weight: 600; color: var(--text-ink, #334155); }
 .item-check {

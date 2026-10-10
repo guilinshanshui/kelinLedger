@@ -2,8 +2,8 @@
     "name" : "Roomie",
     "appid" : "__UNI__YOUR_APPID__",
     "description" : "",
-    "versionName" : "2.1.8",
-    "versionCode" : "2108",
+    "versionName" : "2.1.9",
+    "versionCode" : "2109",
     "transformPx" : false,
     /* 5+App特有相关 */
     "app-plus" : {

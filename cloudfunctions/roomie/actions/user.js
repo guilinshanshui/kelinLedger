@@ -6,7 +6,7 @@ const { optionalString, requireString } = require('../lib/validate')
 const { badRequest } = require('../lib/errors')
 const { cnParts, monthRange } = require('../lib/dates')
 
-const APP_VERSION = '2.1.8'
+const APP_VERSION = '2.1.9'
 
 const base64url = (buffer) =>
   buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -209,6 +209,29 @@ const VERSION_HISTORY = [
     versionNumber: APP_VERSION,
     releaseDate: '2026-10-10',
     status: 'current',
+    changelogs: [
+      {
+        type: 'NEW_FEATURES',
+        content: [
+          '统一微信 / 支付宝账单导入图标的视觉风格',
+          '「我的」版本号与更新日志使用同一版本源'
+        ]
+      },
+      {
+        type: 'FIXED_ISSUES',
+        content: [
+          '修复成员头像跨账号加载失败的问题',
+          '修复经办成员选择器无法显示真实头像的问题',
+          '修复体验版顶部版本号落后于更新日志的问题',
+          '修复账单导入品牌图标与全局主题图标不一致的问题'
+        ]
+      }
+    ]
+  },
+  {
+    versionNumber: '2.1.8',
+    releaseDate: '2026-10-10',
+    status: '',
     changelogs: [
       {
         type: 'NEW_FEATURES',

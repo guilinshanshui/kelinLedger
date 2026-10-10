@@ -13,6 +13,7 @@ const { seedRoom } = require('./seed')
 const { publicUser, publicMember, ROLE_LABEL, rankOf } = require('./context')
 const { badRequest, forbidden, notFound } = require('./errors')
 const { normalizeFeatureCodes, resolveFeatures } = require('./roomFeatures')
+const cloud = require('wx-server-sdk')
 const { pushNotification, pushNotificationMany } = require('./notify')
 const { publishFeed, FEED_TYPES } = require('./activity')
 const { toYuan } = require('./money')
@@ -170,6 +171,32 @@ async function getRoomDetail(roomId, userId = '') {
   }
 }
 
+/** 把跨账号不可直接读取的云文件 ID 换成短期可访问链接。 */
+async function resolveAvatarUrls(rows) {
+  const fileIDs = [...new Set(
+    rows
+      .map((item) => item.avatar)
+      .filter((value) => /^cloud:\/\//.test(String(value || '')))
+  )]
+  if (!fileIDs.length) return rows
+
+  try {
+    const res = await cloud.getTempFileURL({ fileList: fileIDs })
+    const urlMap = new Map(
+      (res.fileList || [])
+        .filter((item) => item.tempFileURL)
+        .map((item) => [item.fileID, item.tempFileURL])
+    )
+    return rows.map((item) => {
+      const url = urlMap.get(item.avatar)
+      return url ? { ...item, avatar: url, avatarFileID: item.avatar } : item
+    })
+  } catch (error) {
+    console.warn('[members] 头像临时链接生成失败', error && (error.errMsg || error.message))
+    return rows
+  }
+}
+
 /** 成员列表（含用户资料快照）。 */
 async function listMembers(roomId) {
   const members = await listAll(COLLECTIONS.members, { roomId, status: 'active' })
@@ -180,9 +207,11 @@ async function listMembers(roomId) {
   )
   const userMap = new Map(users.filter(Boolean).map((user) => [user.id || user._id, user]))
 
-  return members
+  const rows = members
     .map((member) => publicMember(member, userMap.get(member.userId)))
     .sort((a, b) => rankOf(b.role) - rankOf(a.role))
+
+  return resolveAvatarUrls(rows)
 }
 
 /** 生成/刷新邀请码；可直接邀请指定用户。 */
