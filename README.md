@@ -8,6 +8,8 @@ Roomie 是一个专为家庭和同住成员设计的协同生活小程序，提�
 
 | 版本 | 日期 | 主题 | 说明 |
 |------|------|------|------|
+| **v2.3** | 2026-10 | **记账内核** | 账户余额联动、资产总览、分类预算与超支预警、分摊结算、周期账单、CSV 导出 |
+| **v2.2** | 2026-10 | **云端协同** | 接口层迁移到微信云开发；任务管理、动态、成员管理、数据持久化落地 |
 | **v2.1** | 2026-06 | **账单导入** | 微信 / 支付宝账单上传，预览确认后写入同屋账本 |
 | v2.0 | 2026-06 | 生日与提醒 | 主题换肤、家人生日、多渠道提醒、日程与消息中心 |
 
@@ -30,6 +32,24 @@ Roomie 是一个专为家庭和同住成员设计的协同生活小程序，提�
 📖 **功能说明**：[docs/birthday-reminder-features.md](./docs/birthday-reminder-features.md)
 
 ## 核心功能
+## 导航结构
+
+底部固定三个 Tab（`pages.json` 的原生 tabBar）：
+
+| Tab | 页面 | 职责 |
+|---|---|---|
+| 账本 | `pages/room-list/room-list` | 多账本管理：卡片展示支/收/结，切换账本、邀请好友、导入账单、进入成员权限 |
+| 明细 | `pages/home/home` | 当前账本的本月收支、快捷入口（统计分析/账单日历/资产账户）、搜索、记一笔 |
+| 我的 | `pages/profile/profile` | 个人数据面板、资产账户、导入/导出、主题、成员管理 |
+
+当前账本存在 `STORAGE_KEYS.CURRENT_ROOM`，三个 Tab 靠它保持同步。
+启动页 `pages/index/index` 只负责留存邀请参数并跳转到正确的 Tab。
+
+> 注意：Tab 页必须用 `uni.switchTab` 跳转，用 `navigateTo` 会失败。
+
+📖 **部署前模拟验证教程（含官方工具下载地址）**：[docs/simulation-validation-guide.md](./docs/simulation-validation-guide.md)
+
+## 核心功能
 
 ### 1. 家庭清单协作
 - 创建家庭清单（购物清单、待办事项、任务分配）
@@ -39,6 +59,12 @@ Roomie 是一个专为家庭和同住成员设计的协同生活小程序，提�
 
 ### 2. 家庭账本与账单导入 ✨
 - 同屋共享账本，记录收支流水
+- **账户与余额**：现金 / 微信 / 支付宝 / 银行卡等账户，记一笔即联动余额，支持转账
+- **资产总览**：总余额、期间收支、按账户分类与最近变动
+- **预算**：总预算 + 分类预算，超 80% 与超支自动预警
+- **分摊结算**：算清谁垫付、谁该补谁，给出最少转账方案
+- **周期账单**：房租、订阅等每月自动入账（云函数定时触发）
+- **导出**：一键导出 CSV，Excel 打开中文不乱码
 - **账单导入**（v2.1）：上传微信 / 支付宝官方导出文件
 - 解析预览、重复识别、分类与支付方式编辑
 - 详见 [账单导入使用说明](./docs/ledger-import-features.md)
@@ -54,7 +80,7 @@ Roomie 是一个专为家庭和同住成员设计的协同生活小程序，提�
 > 详细说明：[birthday-reminder-features.md](./docs/birthday-reminder-features.md)
 
 ### 4. 主题系统 ✨
-- **6 套预设主题**：经典靛蓝、清新翡翠、浪漫玫瑰、温暖琥珀、极客之夜、幻紫星云
+- **2 套预设主题**：黛青（默认）、暖赭
 - **一键切换**：生日 / 提醒相关界面同步变色
 - **实时切换**：无闪烁切换效果
 - **全局应用**：颜色和图片即时生效
@@ -67,11 +93,25 @@ Roomie 是一个专为家庭和同住成员设计的协同生活小程序，提�
 
 ## 技术架构
 
-- **框架**: uni-app x (Vue 3 + TypeScript)
+- **前端**: uni-app (Vue 3 + TypeScript)
 - **状态管理**: Pinia
-- **网络请求**: 自定义HTTP封装
-- **主题系统**: 自定义主题管理器
+- **后端**: 微信云开发（云函数 + 云数据库 + 云存储），**无需自建服务器**
+- **接口层**: `common/utils/request.ts` 保留原有方法签名，内部通过 `wx.cloud.callFunction` 调用云函数
+- **主题系统**: 轻量 CSS 变量（`common/themes/appTheme.ts` + `useAppTheme`）
 - **UI组件**: 自定义组件库
+
+云函数采用单函数多 action 分发（`cloudfunctions/roomie/`），按 `模块.方法` 路由：
+
+```
+common/api/index.ts         前端 API 定义（只依赖路径常量）
+common/utils/request.ts     传输层 → wx.cloud.callFunction
+cloudfunctions/roomie/
+├── index.js                入口与分发
+├── lib/                    路由、权限、金额、日期、通知等公共能力
+└── actions/                user / room / member / ledger / task / schedule / feed / notification …
+```
+
+完整部署步骤见 **[docs/cloud-setup.md](./docs/cloud-setup.md)**。
 
 ## 项目结构
 
@@ -97,6 +137,22 @@ Roomie/
 - Node.js >= 16
 - uni-app CLI
 - 微信开发者工具
+
+### 部署步骤（简版）
+
+1. 注册小程序，把 AppID 填入 `manifest.json` 与 `common/config/index.ts`
+2. 开通云开发，把环境 ID 填入 `common/config/index.ts` 的 `cloudEnv`
+3. 在云开发控制台创建 13 个集合，权限统一选「仅管理员可读写」
+4. 右键 `cloudfunctions/roomie` →「上传并部署：云端安装依赖」
+5. 编译运行，登录后即可创建空间并邀请成员
+
+集合清单、索引建议与排错见 **[docs/cloud-setup.md](./docs/cloud-setup.md)**。
+
+本地逻辑自测（不需要云环境）：
+
+```bash
+node scripts/smoke-cloud.js
+```
 
 ### 安装依赖
 ```bash
@@ -143,7 +199,7 @@ npm run build:mp-weixin
 ### 4. 主题切换
 在"我的"页面中：
 1. 点击"主题色"
-2. 选择 6 套预设主题之一
+2. 选择黛青或暖赭
 3. 主题会实时应用到整个应用
 
 ## 开发进度
@@ -151,7 +207,7 @@ npm run build:mp-weixin
 ### 已完成 ✅
 - [x] UI框架封装（基础组件和样式系统）
 - [x] 首页 tab 切换（首页 + 我的页面）
-- [x] 主题系统（6 套预设主题，全局颜色切换）
+- [x] 主题系统（2 套预设主题，全局颜色切换）
 - [x] 网络框架（API 封装和请求处理）
 - [x] 用户认证流程
 - [x] 基础页面框架
@@ -161,47 +217,44 @@ npm run build:mp-weixin
 - [x] 消息中心（生日 / 日程提醒卡片）
 - [x] 弹窗交互优化（真机可滚动、底部按钮固定）
 - [x] **账单导入**（微信 / 支付宝，预览确认入库）→ [使用说明](./docs/ledger-import-features.md)
+- [x] **任务管理**（创建 / 指派 / 完成 / 恢复 / 全状态视图，完成自动发动态）
+- [x] **动态**（记账、建任务、完成任务、成员加入、创建日程自动成流，支持手动发布与点赞）
+- [x] **成员管理**（邀请码 / 定向邀请、角色权限、移除与退出）
+- [x] **数据持久化**（全部数据落云数据库，客户端不直连数据库）
+- [x] **账户与余额联动**（支出扣、收入加、转账双动，删改自动冲销回滚）
+- [x] **资产总览与分类预算**（预算进度 + 超支预警）
+- [x] **分摊结算**（谁欠谁 + 最少转账）
+- [x] **周期账单**（定时自动入账，幂等）
+- [x] **流水导出**（带 BOM 的 CSV）
 
 ### 待开发 🔄
-- [ ] 任务管理功能
-- [ ] 动态功能
-- [ ] 成员管理功能
-- [ ] 数据持久化
-- [ ] 后端 API 对接
+- [ ] 游戏计分 / 决策轮盘等娱乐模块的云端同步（目前仍为本地存储 + WebSocket）
+- [ ] H5 端接入 `@cloudbase/js-sdk`（当前云调用仅支持微信小程序端）
+- [ ] 多币种与汇率换算
+- [ ] 语音 / OCR 智能记账（服务端接入，避免客户端泄露密钥）
+- [ ] 借贷（借入/借出）与分期还款
 
 ## 主题系统使用
 
 ### 切换预设主题
 ```typescript
-import { switchTheme } from '@/common/themes'
+import { setAppThemeId } from '@/common/themes/appTheme'
 
-// 切换到深色主题
-switchTheme('dark')
+setAppThemeId('daiqing') // 黛青（默认）
+setAppThemeId('nuanzhe') // 暖赭
 ```
 
-### 创建自定义主题
-```typescript
-import { themeManager } from '@/common/themes'
-
-const customTheme = {
-  name: '我的主题',
-  primaryColor: '#FF6B35',
-  secondaryColor: '#FF8C42',
-  backgroundColor: '#FFF8F3',
-  textColor: '#2D3748',
-  cardBackground: '#FFFFFF',
-  borderColor: '#FED7CC'
-}
-
-themeManager.createCustomTheme(customTheme)
-```
+主题只有两套，颜色值集中在 `App.vue` 的 CSS 变量与 `common/themes/appTheme.ts` 的预设表中。
+页面根节点通过 `useAppTheme().themeClass` 接收 `theme-daiqing` / `theme-nuanzhe`，不需要再维护自定义主题。
 
 ## 注意事项
 
 1. **图标文件**: tabBar图标需要在 `static/icons/` 目录下准备
-2. **主题图片**: 主题背景图和Logo需要在相应目录下准备
-3. **API接口**: 当前使用模拟数据，后续需要对接真实后端
-4. **数据存储**: 目前使用本地存储，生产环境建议使用云存储
+2. **主题**: 只有黛青与暖赭两套，颜色统一在 `App.vue` 与 `common/themes/appTheme.ts` 维护
+3. **接口层**: 已改为微信云函数调用，需先部署 `cloudfunctions/roomie`
+4. **数据存储**: 业务数据全部在云数据库；本地仅保留登录态与主题偏好
+5. **集合权限**: 务必设为「仅管理员可读写」，否则客户端可绕过云函数直接读写数据
+6. **敏感信息**: 不要把 AppSecret、AI Key 等写入客户端代码；需要时放到云函数环境变量
 
 ## 许可证
 

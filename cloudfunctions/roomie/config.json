@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "openapi": []
+  },
+  "triggers": [
+    {
+      "name": "dailyRecurring",
+      "type": "timer",
+      "config": "0 5 1 * * * *"
+    },
+    {
+      "name": "reminderTick",
+      "type": "timer",
+      "config": "0 0 * * * * *"
+    }
+  ]
+}

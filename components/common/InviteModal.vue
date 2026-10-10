@@ -7,12 +7,9 @@
     @touchmove.stop.prevent
   >
     <view 
-      class="modal-panel animate-slide-up" 
+      class="modal-panel" 
       :class="{ 'panel-closing': isClosing }"
-      :style="{ 
-        transform: `translateY(${panelY}px)`, 
-        transition: isSwiping ? 'none' : 'transform 0.4s cubic-bezier(0.19, 1, 0.22, 1)' 
-      }"
+      :style="panelStyle"
       @tap.stop
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
@@ -25,7 +22,7 @@
       <view class="invite-header">
         <view class="header-main">
           <view class="room-icon-tag" :style="{ background: themeColorOpacity }">
-            <text class="room-emoji">{{ roomIcon }}</text>
+            <AppIcon :value="roomIcon" :size="24" :color="themeColor" />
           </view>
           <view class="title-area">
             <text class="invite-label">邀请家人共同管理</text>
@@ -79,13 +76,14 @@ import { ref, watch, computed } from 'vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
 
 const { themeClass, primaryColor } = useAppTheme();
+import { playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
 
 
 const props = defineProps({
   modelValue: Boolean,
   roomName: String,
   inviteCode:String,
-  roomIcon: { type: String, default: '🏠' },
+  roomIcon: { type: String, default: 'mc:home-5' },
   roomId: { type: String, default: 'FL8892' },
   themeColor: { type: String, default: '' }
 });
@@ -96,7 +94,6 @@ const accentColor = computed(() => props.themeColor || primaryColor.value);
 
 // 处理分享事件 - 将 inviteCode 传递给父组件
 const handleShareAppMessage = (res) => {
-  console.log('[InviteModal] 分享来源:', res.from);
   // 将 inviteCode 通过事件传递给父组件处理
   emit('share', {
     from: res.from,
@@ -110,7 +107,7 @@ const handleShareAppMessage = (res) => {
   return {
     title: `${props.roomName} 邀请你加入`,
     path: `/pages/index/index?roomInviteCode=${props.inviteCode}`,
-    imageUrl: '/static/share-imag.png'
+    imageUrl: '/static/share-5x4.png'
   };
 }
 
@@ -128,6 +125,7 @@ watch(() => props.modelValue, (val) => {
   if (val) {
     panelY.value = 0;
     isClosing.value = false;
+    playSheetOpen(panelTransform);
   }
 });
 
@@ -142,6 +140,7 @@ const onTouchMove = (e) => {
   const diff = currentY - startY;
   if (diff > 0) {
     panelY.value = diff;
+    panelTransform.value = { transform: 'translateY(' + diff + 'px)', transition: 'none' };
   }
 };
 
@@ -151,12 +150,17 @@ const onTouchEnd = () => {
     handleClose();
   } else {
     panelY.value = 0;
+    panelTransform.value = { transform: 'translateY(0)', transition: sheetPanelTransition() };
   }
 };
 
+const panelTransform = ref({ transform: 'translateY(100%)', transition: 'none' });
+const panelStyle = computed(() => panelTransform.value);
+
 const handleClose = () => {
+  if (isClosing.value) return;
   isClosing.value = true;
-  panelY.value = 800; // 模拟下滑消失
+  const ms = playSheetClose(panelTransform);
   setTimeout(() => {
     emit('update:modelValue', false);
     isClosing.value = false;
@@ -177,11 +181,13 @@ const handleShare = () => {
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .modal-mask {
   position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+   
   z-index: 10050; display: flex; align-items: flex-end;
-  transition: opacity 0.3s;
+  transition: opacity 0.25s ease-out;
 }
 .mask-closing { opacity: 0; }
 
@@ -192,7 +198,7 @@ const handleShare = () => {
 }
 
 .modal-handle { 
-  width: 42px; height: 5px; background: #E2E8F0; border-radius: 10px; 
+  width: 42px; height: 5px; background: var(--line-hairline, #E2E8F0); border-radius: 10px; 
   margin: 0 auto 32px; 
 }
 
@@ -204,12 +210,12 @@ const handleShare = () => {
   border: 1px solid #F1F5F9;
 }
 .title-area { display: flex; flex-direction: column; gap: 4px; }
-.invite-label { font-size: 11px; font-weight: 900; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px; }
-.room-name { font-size: 22px; font-weight: 900; color: #1E293B; letter-spacing: -0.5px; }
+.invite-label { font-size: 11px; font-weight: 600; color: var(--text-muted, #94A3B8); text-transform: uppercase; letter-spacing: 1.5px; }
+.room-name { font-size: 22px; font-weight: 600; color: var(--text-ink, #1E293B); letter-spacing: 0; }
 
 .invite-body { margin-bottom: 36px; }
 .description-text { 
-  font-size: 15px; font-weight: 600; color: #64748B; 
+  font-size: 15px; font-weight: 600; color: var(--text-sub, #64748B); 
   line-height: 1.6; margin-bottom: 28px; display: block; 
 }
 
@@ -220,22 +226,22 @@ const handleShare = () => {
   border: 1px solid #F1F5F9;
 }
 .guide-item { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-.g-label { font-size: 10px; font-weight: 900; color: #CBD5E1; text-transform: uppercase; letter-spacing: 1px; }
+.g-label { font-size: 10px; font-weight: 600; color: var(--text-faint, #CBD5E1); text-transform: uppercase; letter-spacing: 1px; }
 .g-content { display: flex; align-items: center; gap: 10px; }
-.g-txt { font-size: 13px; font-weight: 800; color: #475569; }
+.g-txt { font-size: 13px; font-weight: 600; color: var(--text-sub, #475569); }
 
-.v-divider { width: 1px; height: 36px; background: #E2E8F0; margin: 0 24px; }
+.v-divider { width: 1px; height: 36px; background: var(--line-hairline, #E2E8F0); margin: 0 24px; }
 
 /* 扁平化操作按钮：2:1 比例 */
 .modal-footer { display: flex; gap: 14px; margin-bottom: 10px; }
 
 .btn-primary { 
-  flex: 2; height: 60px; background: var(--primary-color, #4F46E5); border-radius: 22px; 
+  flex: 2; height: 60px; background: var(--primary-color, #2F5D6B); border-radius: 22px; 
   display: flex; align-items: center; justify-content: center; border: none;
-  box-shadow: 0 10px 25px var(--primary-glow, rgba(79, 70, 229, 0.2));
+  box-shadow: 0 10px 25px var(--primary-glow, rgba(47, 93, 107, 0.2));
 }
 .btn-primary:active { transform: scale(0.96); opacity: 0.9; }
-.btn-primary-txt { color: #fff; font-size: 16px; font-weight: 900; }
+.btn-primary-txt { color: #fff; font-size: 16px; font-weight: 600; }
 
 .btn-secondary { 
 	  border: none;          /* 去边框 */
@@ -243,16 +249,17 @@ const handleShare = () => {
   flex: 1; height: 64px; background: #F8FAFC; border-radius: 22px; 
   display: flex; align-items: center; justify-content: center; border: none;
 }
-/* 🔥 关键在这 */
+/* 关键在这 */
 .btn-secondary::after {
   border: none;
 }
 .btn-secondary:active { background: #F1F5F9; transform: scale(0.96); }
-.btn-secondary-txt { color: #94A3B8; font-size: 16px; font-weight: 800; }
+.btn-secondary-txt { color: var(--text-muted, #94A3B8); font-size: 16px; font-weight: 600; }
 
 .safe-area-bottom { height: env(safe-area-inset-bottom); margin-top: 12px; }
 
 /* 动画效果：参考 BottomPicker */
-.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.19, 1, 0.22, 1); }
+.animate-slide-up { animation: slideUp 0.38s cubic-bezier(0.32, 0.72, 0, 1); }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>
+import AppIcon from './AppIcon.vue';

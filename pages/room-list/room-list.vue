@@ -1,350 +1,500 @@
 <template>
-  <view :class="themeClass" class="list-container">
-    <view class="page-ambient" aria-hidden="true">
-      <view class="ambient-blob blob-primary"></view>
-      <view class="ambient-blob blob-secondary"></view>
-    </view>
-    <IosNav 
-      title="我的所有空间" 
-      @leftClick="goBack" 
-      @rightClick="onAddRoom" 
-      rightIcon="+" 
-    />
-
-    <!-- 搜索区域 -->
-    <view class="search-section">
-      <view class="search-bar">
-        <text class="search-icon">🔍</text>
-        <input class="search-input" placeholder="输入房间名称搜索..." placeholder-style="color: #94A3B8" />
-      </view>
-    </view>
-
-    <!-- 列表区域：增加左右内边距 -->
-    <scroll-view scroll-y class="list-scroll-view" :show-scrollbar="false">
-      <view class="room-cards-stack">
-        <view 
-          v-for="(room, index) in roomsWithMembers" 
-          :key="room.id" 
-          class="modern-room-card animate-fade-in"
-          :style="{ animationDelay: (index * 0.08) + 's' }"
-          @click="goToDashboard(room)"
-        >
-          <!-- 卡片上部：核心信息 -->
-          <view class="card-upper">
-            <view class="room-identity">
-              <view class="room-icon-outer" :style="{ background: room.bgColor }">
-                <image v-if="isImageUrl(room.icon)" :src="room.icon" mode="aspectFill" class="room-icon-img" />
-                <text v-else class="room-emoji">{{ room.icon }}</text>
-              </view>
-              <view class="room-text">
-                <text class="room-name">{{ room.name }}</text>
-                <view class="room-status-row">
-                  <view class="pulse-dot"></view>
-                  <text class="status-txt">活跃中</text>
-                </view>
-              </view>
-            </view>
-            <view class="arrow-btn">›</view>
-          </view>
-
-          <!-- 分割线 -->
-          <view class="card-divider"></view>
-
-          <!-- 卡片下部：成员与时间 (确保头像有独立空间) -->
-          <view class="card-lower">
-            <view class="member-preview">
-              <view class="avatar-stack">
-                <view 
-                  v-for="(member, idx) in (room.membersArray || []).slice(0, 3)"
-                  :key="idx" 
-                  class="avt-item"
-                  :style="{ marginLeft: idx === 0 ? '0' : '-16rpx', zIndex: 10 - idx }"
-                >
-                  <image :src="member.avatar || `https://i.pravatar.cc/100?u=h${room.id}${idx}`" class="avt-img" />
-                </view>
-                <view v-if="room.membersArray && room.membersArray.length > 3" class="avt-more">
-                  <text class="more-txt">+{{ room.membersArray.length - 3 }}</text>
-                </view>
-              </view>
-              <text class="member-count-label">{{ (room.membersArray || []).length }} 位家庭成员</text>
-            </view>
-            
-            <view class="update-info">
-              <text class="update-label">最后更新</text>
-              <text class="update-time">{{ formatRelativeTime(room.updateAt) }}</text>
-            </view>
-          </view>
+  <view :class="themeClass" class="books-page">
+    <!-- 顶部标题区（Tab 页，无返回按钮） -->
+    <view class="page-header">
+      <view class="header-row">
+        <text class="header-sub">共 {{ rooms.length }} 个账本，点击卡片即可切换</text>
+        <view class="header-action" @click="onAddRoom">
+          <text class="header-action-icon">+</text>
         </view>
       </view>
-      
-      <!-- 底部安全区域占位 -->
+    </view>
+
+    <scroll-view scroll-y class="books-scroll" :show-scrollbar="false">
+      <!-- 账本卡片 -->
+      <view class="cards-stack">
+        <view
+          v-for="(room, index) in rooms"
+          :key="room.id"
+          class="book-card animate-fade-in"
+          :class="{ 'is-current': room.id === currentRoomId }"
+          :style="{ animationDelay: index * 0.06 + 's' }"
+          @click="onSwitchBook(room)"
+        >
+          <!-- 上部：图标 + 名称 + 人数 + 设置 -->
+          <view class="card-top">
+            <view class="book-icon" :style="{ background: softColor }">
+              <AppIcon :value="room.avatar || 'mc:notebook-2'" :size="24" />
+            </view>
+
+            <view class="book-meta">
+              <view class="book-name-row">
+                <text class="book-name">{{ room.name }}</text>
+                <view v-if="room.id === currentRoomId" class="current-tag">
+                  <text class="current-tag-txt">当前</text>
+                </view>
+              </view>
+              <text class="book-members">{{ room.memberCount || 1 }} 人</text>
+            </view>
+
+            <view class="gear-btn" @click.stop="onManage(room)">
+            <AppIcon name="settings-3" :size="18" />
+            </view>
+          </view>
+
+          <!-- 中部：支 / 收 / 结 -->
+          <view class="stats-row">
+            <view class="stat-col">
+              <text class="stat-label">支</text>
+              <text class="stat-value expense">{{ formatMoneyShort(room.stats?.expense) }}</text>
+            </view>
+            <view class="stat-divider"></view>
+            <view class="stat-col">
+              <text class="stat-label">收</text>
+              <text class="stat-value income">{{ formatMoneyShort(room.stats?.income) }}</text>
+            </view>
+            <view class="stat-divider"></view>
+            <view class="stat-col">
+              <text class="stat-label">结</text>
+              <text class="stat-value balance">{{ formatMoneyShort(room.stats?.balance) }}</text>
+            </view>
+          </view>
+
+          <!-- 下部：操作按钮 -->
+          <view v-if="room.canManage" class="card-actions">
+            <button class="action-btn primary" @click.stop="onInvite(room)">
+              <text class="action-txt">邀请好友</text>
+            </button>
+            <button class="action-btn ghost" @click.stop="onImport(room)">
+              <text class="action-txt ghost-txt">导入账单</text>
+            </button>
+          </view>
+        </view>
+
+        <!-- 添加账本 -->
+        <view class="add-card" @click="onAddRoom">
+          <text class="add-plus">+</text>
+          <text class="add-txt">添加账本</text>
+        </view>
+      </view>
+
       <view class="safe-bottom-spacer"></view>
     </scroll-view>
+
+    <!-- 邀请码弹窗 -->
+    <view v-if="inviteVisible" class="modal-mask" @click="inviteVisible = false">
+      <view class="modal-box" @click.stop>
+        <text class="modal-title">邀请好友加入</text>
+        <text class="modal-book">{{ inviteRoomName }}</text>
+        <view class="invite-code-box">
+          <text class="invite-code">{{ inviteCode || '------' }}</text>
+        </view>
+        <text class="modal-hint">把邀请码发给家人或室友，让他们在「账本」页点「加入」输入即可</text>
+        <button class="action-btn primary modal-btn" @click="copyInviteCode">
+          <text class="action-txt">复制邀请码</text>
+        </button>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup>
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
-const { themeClass, primaryColor, softColor, theme } = useAppTheme()
+const { themeClass, softColor } = useAppTheme()
 
-import { ref, onMounted, computed } from 'vue';
-import IosNav from '../../components/nav/ios-nav.vue';
-import { roomApi } from '../../common/api';
-import { formatRelativeTime } from '../../pages/js/utils.js';
+import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import { roomApi } from '../../common/api'
+import { STORAGE_KEYS } from '../../common/config'
+import { formatMoneyShort } from '../../pages/js/utils.js'
+import AppIcon from '../../components/common/AppIcon.vue'
 
-const rooms = ref([]);
+const rooms = ref([])
+const currentRoomId = ref('')
+const inviteVisible = ref(false)
+const inviteCode = ref('')
+const inviteRoomName = ref('')
 
-const isImageUrl = (val) => {
-  if (typeof val !== 'string') return false;
-  const v = val.toLowerCase();
-  return v.startsWith('http') || v.startsWith('/') || v.startsWith('data:image') || v.includes('.png') || v.includes('.jpg') || v.includes('.jpeg') || v.includes('.webp');
-};
-
-onMounted(() => {
-  getRoomList();
-});
-
-const getRoomList = async () => {
-  var res = await roomApi.getRoomList();
-  if (res.code == 0) {
-    rooms.value = res.data;
+const readCurrentRoom = () => {
+  try {
+    const saved = uni.getStorageSync(STORAGE_KEYS.CURRENT_ROOM)
+    currentRoomId.value = (saved && saved.id) || ''
+  } catch (error) {
+    currentRoomId.value = ''
   }
 }
 
-const roomsWithMembers = computed(() => {
-  return (rooms.value || []).map(room => {
-    const membersRaw = room.members
-    let membersArray = []
-    if (!membersRaw) membersArray = []
-    else if (Array.isArray(membersRaw)) membersArray = membersRaw
-    else {
-      try { membersArray = JSON.parse(membersRaw) }
-      catch { membersArray = [] }
+const loadRooms = async () => {
+  try {
+    const res = await roomApi.getRoomList()
+    if (res.code === 0) {
+      rooms.value = res.data || []
+      // 没有当前账本时，默认选中第一个，避免「明细」页空白
+      if (!currentRoomId.value && rooms.value.length) {
+        setCurrentRoom(rooms.value[0])
+      }
     }
+  } catch (error) {
+    console.error('[账本] 加载失败', error)
+  }
+}
 
-    return {
-      ...room,
-      membersArray,
-      // 如果后端没返回 bgColor，默认给个浅灰色
-      bgColor: room.bgColor || '#F8FAFC'
+const setCurrentRoom = (room) => {
+  currentRoomId.value = room.id
+  try {
+    uni.setStorageSync(STORAGE_KEYS.CURRENT_ROOM, {
+      id: room.id,
+      name: room.name,
+      avatar: room.avatar || 'mc:notebook-2'
+    })
+  } catch (error) {
+    console.error('[账本] 保存当前账本失败', error)
+  }
+}
+
+/** 点击卡片：切换账本并跳到明细页 */
+const onSwitchBook = (room) => {
+  if (room.id === currentRoomId.value) {
+    uni.switchTab({ url: '/pages/home/home' })
+    return
+  }
+  setCurrentRoom(room)
+  uni.showToast({ title: `已切换到「${room.name}」`, icon: 'none' })
+  setTimeout(() => uni.switchTab({ url: '/pages/home/home' }), 300)
+}
+
+const onAddRoom = () => uni.navigateTo({ url: '/pages/create-room/create-room' })
+const onManage = (room) => {
+  setCurrentRoom(room)
+  uni.navigateTo({ url: `/pages/room-settings/room-settings?roomId=${room.id}` })
+}
+const onImport = (room) => {
+  setCurrentRoom(room)
+  uni.navigateTo({ url: `/pages/ledger-import/ledger-import?roomId=${room.id}` })
+}
+
+const onInvite = async (room) => {
+  setCurrentRoom(room)
+  inviteRoomName.value = room.name
+  inviteCode.value = ''
+  inviteVisible.value = true
+
+  try {
+    const res = await roomApi.generateInviteCode(room.id)
+    if (res.code === 0) {
+      inviteCode.value = res.data.code || res.data.inviteCode || ''
     }
+  } catch (error) {
+    inviteVisible.value = false
+    uni.showToast({ title: '生成邀请码失败', icon: 'none' })
+  }
+}
+
+const copyInviteCode = () => {
+  if (!inviteCode.value) return
+  uni.setClipboardData({
+    data: inviteCode.value,
+    success: () => uni.showToast({ title: '邀请码已复制', icon: 'success' })
   })
-})
+}
 
-const goBack = () => uni.navigateBack();
-const onAddRoom = () => uni.navigateTo({ url: '/pages/create-room/create-room' });
-const goToDashboard = (room) => uni.navigateTo({ url: `/pages/dashboard/dashboard?name=${room.name}&roomId=${room.id}` });
+// Tab 页每次显示都刷新，保证从明细页返回时数据是最新的
+onShow(() => {
+  readCurrentRoom()
+  loadRooms()
+})
 </script>
 
 <style scoped>
-.list-container { 
-  background-color: var(--primary-soft, #EEF2FF);
-  height: 100vh; 
-  display: flex; 
-  flex-direction: column; 
+.books-page {
+  min-height: 100vh;
+  background: var(--bg-page, #F6F8F8);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- 顶部工具行 ---- */
+.page-header {
+  padding: 12px 20px;
+  background: #FFFFFF;
+}
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.header-action {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-soft, #E9F0F2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.header-action-icon {
+  font-size: 20px;
+  color: var(--primary-color, #2F5D6B);
+  line-height: 1;
+}
+.header-sub {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-sub, #64748B);
   overflow: hidden;
-  position: relative;
-  transition: background-color 0.35s ease;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.page-ambient { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-.ambient-blob { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.12; transition: background 0.35s ease; }
-.blob-primary { top: -40px; right: -40px; width: 280px; height: 280px; background: var(--primary-color, #4F46E5); }
-.blob-secondary { bottom: 15%; left: -60px; width: 240px; height: 240px; background: var(--secondary-color, #7C3AED); }
-
-.search-section { 
-  padding: 16px 20px; 
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(20px);
-  position: relative;
-  z-index: 1;
-}
-.search-bar { 
-  background: var(--primary-soft, #EEF2FF); 
-  height: 48px; 
-  border-radius: 14px; 
-  display: flex; 
-  align-items: center; 
-  padding: 0 16px; 
-  gap: 12px; 
-}
-.search-icon { font-size: 14px; opacity: 0.3; }
-.search-input { flex: 1; font-size: 14px; font-weight: 600; color: #1E293B; }
-
-.list-scroll-view { 
-  flex: 1; 
+.books-scroll {
+  flex: 1;
   height: 0;
-  position: relative;
-  z-index: 1;
+}
+.cards-stack {
+  padding: 12px 16px 0;
 }
 
-.room-cards-stack { 
-  padding: 20px; 
-  display: flex; 
-  flex-direction: column; 
+/* ---- 账本卡片 ---- */
+.book-card {
+  background: #FFFFFF;
+  border-radius: var(--radius-md, 12px);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border: 1px solid #EEF1F5;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+.book-card:active {
+  transform: scale(0.985);
+}
+.book-card.is-current {
+  border-color: var(--primary-color, #2F5D6B);
 }
 
-/* 现代化卡片重构 */
-.modern-room-card {
-  background: #fff;
-  border-radius: 32px;
-  padding: 15px 20px;
-  margin-bottom: 20px;
-  border: 1px solid #F1F5F9;
-  box-shadow: 0 4px 20px var(--primary-glow, rgba(0,0,0,0.01));
-  display: flex;
-  flex-direction: column;
-  transition: border-color 0.35s ease, box-shadow 0.35s ease;
-}
-
-.modern-room-card:active {
-  transform: scale(0.98);
-  background: #FAFAFA;
-  border-color: var(--primary-color, #4F46E5);
-}
-
-.card-upper {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.room-identity {
+.card-top {
   display: flex;
   align-items: center;
-  gap: 16px;
 }
-
-.room-icon-outer {
-  width: 52px;
-  height: 52px;
-  border-radius: 18px;
+.book-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md, 12px);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0;
 }
-.room-emoji { font-size: 24px; }
-.room-icon-img { width: 32px; height: 32px; border-radius: 8px; }
-
-.room-text {
-  display: flex;
-  flex-direction: column;
+.book-meta {
+  flex: 1;
+  margin-left: 12px;
+  min-width: 0;
 }
-.room-name {
-  font-size: 17px;
-  font-weight: 900;
-  color: #1E293B;
-  letter-spacing: -0.5px;
-}
-.room-status-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-.pulse-dot {
-  width: 6px;
-  height: 6px;
-  background: #10B981;
-  border-radius: 50%;
-}
-.status-txt {
-  font-size: 11px;
-  font-weight: 800;
-  color: #94A3B8;
-  text-transform: uppercase;
-}
-
-.arrow-btn {
-  font-size: 24px;
-  color: var(--primary-color, #4F46E5);
-  font-weight: 300;
-  opacity: 0.7;
-}
-
-.card-divider {
-  height: 1px;
-  background: #F8FAFC;
-  width: 100%;
-  margin-bottom: 10px;
-}
-
-.card-lower {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.member-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.avatar-stack {
+.book-name-row {
   display: flex;
   align-items: center;
 }
-.avt-item {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 4rpx solid #fff;
+.book-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
   overflow: hidden;
-  background: #F1F5F9;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.avt-img { width: 100%; height: 100%; }
-
-.avt-more {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #F8FAFC;
-  border: 4rpx solid #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: -16rpx;
-  z-index: 1;
+.current-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--primary-soft, #E9F0F2);
+  flex-shrink: 0;
 }
-.more-txt { font-size: 10px; font-weight: 900; color: #94A3B8; }
-
-.member-count-label {
-  font-size: 11px;
-  font-weight: 800;
-  color: #CBD5E1;
-}
-
-.update-info {
-  text-align: right;
-  display: flex;
-  flex-direction: column;
-}
-.update-label {
+.current-tag-txt {
   font-size: 10px;
-  font-weight: 800;
-  color: #CBD5E1;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: var(--primary-color, #2F5D6B);
 }
-.update-time {
+.book-members {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-muted, #94A3B8);
+}
+.gear-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gear-icon {
+  font-size: 18px;
+  color: var(--text-muted, #94A3B8);
+}
+
+/* ---- 支 / 收 / 结 ---- */
+.stats-row {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #F5F7FA;
+}
+.stat-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted, #94A3B8);
+}
+.stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-value.expense {
+  color: var(--color-expense, #C4554D);
+}
+.stat-value.income {
+  color: var(--color-income, #3E8E6E);
+}
+.stat-value.balance {
+  color: var(--text-ink, #1E293B);
+}
+.stat-divider {
+  width: 1px;
+  height: 14px;
+  background: #EEF1F5;
+}
+
+/* ---- 卡片按钮 ---- */
+.card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.action-btn {
+  flex: 1;
+  height: 36px;
+  line-height: 36px;
+  border-radius: var(--radius-lg, 16px);
   font-size: 13px;
-  font-weight: 800;
-  color: #94A3B8;
-  margin-top: 2px;
+  padding: 0;
+  margin: 0;
+}
+.action-btn::after {
+  border: none;
+}
+.action-btn.primary {
+  background: var(--primary-color, #2F5D6B);
+}
+.action-txt {
+  color: #FFFFFF;
+  font-size: 13px;
+}
+.action-btn.ghost {
+  background: var(--primary-soft, #E9F0F2);
+}
+.ghost-txt {
+  color: var(--primary-color, #2F5D6B);
+}
+
+/* ---- 添加账本 ---- */
+.add-card {
+  height: 92px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px dashed var(--text-faint, #CBD5E1);
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.add-card:active {
+  background: #FAFBFC;
+}
+.add-plus {
+  font-size: 28px;
+  color: var(--text-faint, #CBD5E1);
+  line-height: 1;
+}
+.add-txt {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-muted, #94A3B8);
 }
 
 .safe-bottom-spacer {
-  height: calc(100px + env(safe-area-inset-bottom));
+  height: calc(40px + env(safe-area-inset-bottom));
+}
+
+/* ---- 邀请弹窗 ---- */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.modal-box {
+  width: 280px;
+  background: #FFFFFF;
+  border-radius: var(--radius-lg, 16px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
+}
+.modal-book {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #94A3B8);
+}
+.invite-code-box {
+  margin: 16px 0 10px;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--primary-soft, #E9F0F2);
+}
+.invite-code {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 6px;
+  color: var(--primary-color, #2F5D6B);
+}
+.modal-hint {
+  font-size: 11px;
+  color: var(--text-muted, #94A3B8);
+  text-align: center;
+  line-height: 1.6;
+}
+.modal-btn {
+  width: 100%;
+  margin-top: 16px;
+  flex: none;
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out both;
+  animation: fadeIn 0.35s ease-out both;
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 </style>

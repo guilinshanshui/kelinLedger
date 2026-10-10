@@ -1,6 +1,10 @@
 import { onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { getCurrentInstance } from 'vue'
 
+/** 分享卡片图：好友是 5:4，朋友圈是 1:1，两套比例不一样，别混用 */
+const SHARE_IMAGE_CARD = '/static/share-5x4.png'
+const SHARE_IMAGE_TIMELINE = '/static/share-1x1.png'
+
 
 
 export function useGlobalShare(options = {}) {
@@ -33,7 +37,7 @@ export function useGlobalShare(options = {}) {
       return {
         title: title || '',
         path: `/pages/index/index?roomInviteCode=${inviteCode}&from=share`,
-        imageUrl: options.imageUrl || '/static/share-image.png'
+        imageUrl: options.imageUrl || SHARE_IMAGE_CARD
       }
     }
 
@@ -41,7 +45,8 @@ export function useGlobalShare(options = {}) {
     return {
       title: title || '',
       path: (path || '/pages/index/index') + '?from=share',
-      imageUrl: options.imageUrl || ''
+      // 不给图片时微信会截屏当卡片，滚动容器页面经常截成空白，统一用品牌图
+      imageUrl: options.imageUrl || SHARE_IMAGE_CARD
     }
   })
 
@@ -72,7 +77,8 @@ export function useGlobalShare(options = {}) {
     return {
       title: title || '',
       query,
-      imageUrl: options.imageUrl || '/static/share-image.png'
+      // 朋友圈卡片是 1:1，用方形版本，避免被裁掉品牌名
+      imageUrl: options.imageUrl || SHARE_IMAGE_TIMELINE
     }
   })
 }

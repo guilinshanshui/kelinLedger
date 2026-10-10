@@ -9,18 +9,24 @@
     <view
       class="global-fixed-drawer"
       :class="themeClass"
-      :style="{ transform: `translateY(${panelY}px)` }"
+      :style="panelStyle"
       @click.stop
-      @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
     >
-      <view class="modal-handle" :style="{ background: primaryColor }"></view>
-      <view class="modal-header">
-        <view class="header-main">
-          <text class="modal-title">{{ form.id ? '编辑任务项' : '新建协作任务' }}</text>
+      <!-- 拖拽关闭只绑在头部，表单内容的滚动交给 scroll-view -->
+      <view
+        class="drawer-drag-zone"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+        @touchcancel="onTouchEnd"
+      >
+        <view class="modal-handle" :style="{ background: primaryColor }"></view>
+        <view class="modal-header">
+          <view class="header-main">
+            <text class="modal-title">{{ form.id ? '编辑任务项' : '新建协作任务' }}</text>
+          </view>
+          <view v-if="form.id" class="modal-delete-btn" @click="handleDelete">删除</view>
         </view>
-        <view v-if="form.id" class="modal-delete-btn" @click="handleDelete">删除</view>
       </view>
       <scroll-view scroll-y class="modal-scroll-body">
         <view class="modal-inner-padding">
@@ -42,7 +48,7 @@
               <text class="mc-label">经办人</text>
               <view class="mc-val-box">
                 <image v-if="assigneeAvatar" :src="assigneeAvatar" class="mc-avt-mini" mode="aspectFill" />
-                <view v-else class="mc-avt-placeholder">👤</view>
+                <view v-else class="mc-avt-placeholder"><AppIcon name="user-2" :size="22" /></view>
                 <text class="mc-val mc-val-ellipsis">{{ form.assignee ? form.assignee.label : '所有人' }}</text>
                 <text class="mc-arrow">›</text>
               </view>
@@ -50,8 +56,8 @@
             <view class="m-config-card">
               <text class="mc-label">设为紧急</text>
               <view class="mc-val-box urgent-row">
-                <text class="mc-val" :style="{ color: form.isUrgent ? '#F43F5E' : '#94A3B8' }">{{ form.isUrgent ? '紧急' : '普通' }}</text>
-                <switch :checked="form.isUrgent" @change="form.isUrgent = $event.detail.value" color="#F43F5E" scale="0.6" />
+      <text class="mc-val" :style="{ color: form.isUrgent ? expenseColor : 'var(--text-muted, #5D6E84)' }">{{ form.isUrgent ? '紧急' : '普通' }}</text>
+      <switch :checked="form.isUrgent" @change="form.isUrgent = $event.detail.value" :color="expenseColor" scale="0.6" />
               </view>
             </view>
           </view>
@@ -60,7 +66,7 @@
             <picker mode="date" :start="todayStr" :value="pickerDate" @change="onDueDateChange">
               <view class="picker-card-option">
                 <view class="pc-left">
-                  <text class="pc-emoji">📅</text>
+                  <AppIcon name="calendar-2" :size="16" />
                   <text class="pc-label">完成日期</text>
                 </view>
                 <view class="pc-right">
@@ -137,6 +143,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
 import BottomPicker from '../common/BottomPicker.vue'
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import { getDateStr, normalizeTaskDueDate } from '../../pages/js/utils.js'
@@ -157,7 +164,7 @@ function findRoomMember(roomMembers, assigneeId) {
   ) || null
 }
 
-const { themeClass, primaryColor } = useAppTheme()
+const { themeClass, primaryColor, expenseColor } = useAppTheme()
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -290,6 +297,7 @@ watch(
     if (visible) {
       panelY.value = 0
       isClosing.value = false
+      playSheetOpen(panelTransform)
       fillForm(props.initialTask)
     } else {
       resetForm()
@@ -319,14 +327,18 @@ function close() {
   emit('update:modelValue', false)
 }
 
+const panelTransform = ref({ transform: 'translateY(100%)', transition: 'none' })
+const panelStyle = computed(() => panelTransform.value)
+
 function closeAnimated() {
+  if (isClosing.value) return
   isClosing.value = true
-  panelY.value = 800
+  const ms = playSheetClose(panelTransform)
   setTimeout(() => {
     emit('update:modelValue', false)
     isClosing.value = false
     panelY.value = 0
-  }, 300)
+  }, ms)
 }
 
 function onTouchStart(e) {
@@ -335,12 +347,18 @@ function onTouchStart(e) {
 
 function onTouchMove(e) {
   const diff = e.touches[0].clientY - startY
-  if (diff > 0) panelY.value = diff
+  if (diff > 0) {
+    panelY.value = diff
+    panelTransform.value = { transform: 'translateY(' + diff + 'px)', transition: 'none' }
+  }
 }
 
 function onTouchEnd() {
   if (panelY.value > 150) closeAnimated()
-  else panelY.value = 0
+  else {
+    panelY.value = 0
+    panelTransform.value = { transform: 'translateY(0)', transition: sheetPanelTransition() }
+  }
 }
 
 function onAssigneeChange(item) {
@@ -403,11 +421,12 @@ function handleViewLedgers() {
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .global-fixed-mask {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(25px);
   z-index: 9999;
   display: flex;
   align-items: flex-end;
@@ -421,8 +440,14 @@ function handleViewLedgers() {
   height: 72vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 -20px 60px var(--primary-glow, rgba(79, 70, 229, 0.15));
+  box-shadow: 0 -20px 60px var(--primary-glow, rgba(47, 93, 107, 0.15));
   padding-top: 8px;
+}
+/* 拖拽关闭只在这个区域生效，表单滚动不再被面板拖走 */
+.drawer-drag-zone {
+  position: relative;
+  z-index: 1;
+  flex: none;
 }
 .modal-handle {
   width: 42px;
@@ -439,14 +464,14 @@ function handleViewLedgers() {
 }
 .modal-title {
   font-size: 22px;
-  font-weight: 900;
-  color: #1e293b;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
   margin-top: 4px;
   display: block;
 }
 .modal-delete-btn {
   font-size: 15px;
-  color: #f43f5e;
+  color: var(--color-expense, #F43F5E);
   font-weight: bold;
   padding: 10px;
 }
@@ -454,8 +479,8 @@ function handleViewLedgers() {
 .modal-inner-padding { padding: 0 24px 24px; }
 .modal-label {
   font-size: 11px;
-  font-weight: 900;
-  color: #cbd5e1;
+  font-weight: 600;
+  color: var(--text-faint, #CBD5E1);
   margin-bottom: 14px;
   display: block;
   text-transform: uppercase;
@@ -465,20 +490,20 @@ function handleViewLedgers() {
   background: #fff;
   border-radius: 16px;
   padding: 14px 16px;
-  border: 1px solid var(--primary-soft, #eef2ff);
+  border: 1px solid var(--primary-soft, #e9f0f2);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
   box-sizing: border-box;
 }
 .field-shell-focus {
-  border-color: var(--primary-color, #4f46e5);
-  box-shadow: 0 8px 20px var(--primary-glow, rgba(79, 70, 229, 0.1));
+  border-color: var(--primary-color, #2f5d6b);
+  box-shadow: 0 8px 20px var(--primary-glow, rgba(47, 93, 107, 0.1));
 }
 .title-input-card { margin-bottom: 10px; }
 .title-textarea-flat {
   width: 100%;
   font-size: 20px;
-  font-weight: 900;
-  color: #1e293b;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
   line-height: 1.4;
 }
 .modal-input-group { margin-bottom: 20px; }
@@ -489,18 +514,18 @@ function handleViewLedgers() {
   margin: 20px 0;
 }
 .m-config-card {
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   border-radius: 20px;
   padding: 14px;
-  border: 1px solid var(--primary-glow, rgba(79, 70, 229, 0.08));
+  border: 1px solid var(--primary-glow, rgba(47, 93, 107, 0.08));
   min-height: 72px;
   box-sizing: border-box;
 }
 .m-config-card.assignee-card:active { opacity: 0.92; }
 .mc-label {
   font-size: 10px;
-  font-weight: 800;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   text-transform: uppercase;
   display: block;
   margin-bottom: 8px;
@@ -530,14 +555,14 @@ function handleViewLedgers() {
   align-items: center;
   justify-content: center;
   font-size: 16px;
-  border: 1px solid var(--primary-glow, rgba(79, 70, 229, 0.12));
+  border: 1px solid var(--primary-glow, rgba(47, 93, 107, 0.12));
 }
 .mc-val {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  font-weight: 800;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
 }
 .mc-val-ellipsis {
   overflow: hidden;
@@ -546,7 +571,7 @@ function handleViewLedgers() {
 }
 .mc-arrow {
   font-size: 16px;
-  color: var(--primary-color, #4f46e5);
+  color: var(--primary-color, #2f5d6b);
   flex-shrink: 0;
   opacity: 0.5;
 }
@@ -557,24 +582,24 @@ function handleViewLedgers() {
   justify-content: space-between;
   align-items: center;
   padding: 0 20px;
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   border-radius: 20px;
-  border: 1px solid var(--primary-glow, rgba(79, 70, 229, 0.08));
+  border: 1px solid var(--primary-glow, rgba(47, 93, 107, 0.08));
   box-sizing: border-box;
 }
 .pc-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .pc-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .pc-emoji { font-size: 18px; }
-.pc-label { font-size: 15px; font-weight: 800; color: #475569; }
-.pc-val { font-size: 15px; font-weight: 900; color: var(--primary-color, #4f46e5); }
-.pc-clear { font-size: 12px; font-weight: 800; color: #94a3b8; padding: 6px 0 6px 8px; }
+.pc-label { font-size: 15px; font-weight: 600; color: var(--text-sub, #475569); }
+.pc-val { font-size: 15px; font-weight: 600; color: var(--primary-color, #2f5d6b); }
+.pc-clear { font-size: 12px; font-weight: 600; color: var(--text-muted, #94A3B8); padding: 6px 0 6px 8px; }
 .remark-box { padding: 12px 16px; }
 .remark-textarea {
   width: 100%;
   height: 120px;
   font-size: 15px;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-ink, #334155);
   line-height: 1.5;
 }
 .modal-footer { padding: 12px 24px; }
@@ -583,13 +608,13 @@ function handleViewLedgers() {
   align-items: center;
   display: flex;
   width: 100%;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   color: #fff;
   height: 72px;
   border-radius: 24px;
   font-size: 17px;
-  font-weight: 900;
-  box-shadow: 0 10px 30px var(--primary-glow, rgba(79, 70, 229, 0.25));
+  font-weight: 600;
+  box-shadow: 0 10px 30px var(--primary-glow, rgba(47, 93, 107, 0.25));
   border: none;
 }
 
@@ -610,13 +635,13 @@ function handleViewLedgers() {
 }
 .ledger-summary-amount {
   font-size: 13px;
-  font-weight: 800;
-  color: #059669;
+  font-weight: 600;
+  color: var(--color-income, #059669);
 }
 .ledger-summary-count {
   font-size: 11px;
-  font-weight: 700;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
 }
 .ledger-record-list {
   display: flex;
@@ -641,16 +666,16 @@ function handleViewLedgers() {
   flex: 1;
   min-width: 0;
   font-size: 14px;
-  font-weight: 700;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .lr-amount {
   font-size: 14px;
-  font-weight: 800;
-  color: #1f2937;
+  font-weight: 600;
+  color: var(--text-ink, #1F2937);
   flex-shrink: 0;
 }
 .lr-date {
@@ -658,16 +683,16 @@ function handleViewLedgers() {
   margin-top: 4px;
   font-size: 11px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
 }
 .ledger-empty {
   padding: 18px 14px;
   border-radius: 16px;
   background: #f8fafc;
-  border: 1px dashed #e2e8f0;
+  border: 1px dashed var(--line-hairline, #E2E8F0);
   font-size: 12px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
   text-align: center;
   margin-bottom: 12px;
 }
@@ -683,13 +708,13 @@ function handleViewLedgers() {
 }
 .ledger-records-hint text {
   font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
 }
 .ledger-records-hint-sub {
   font-size: 11px !important;
   font-weight: 500 !important;
-  color: #94a3b8 !important;
+  color: var(--text-muted, #94A3B8) !important;
 }
 .ledger-actions {
   display: flex;
@@ -699,17 +724,18 @@ function handleViewLedgers() {
   flex: 1;
   height: 42px;
   border-radius: 14px;
-  background: var(--primary-soft, #eef2ff);
-  color: var(--primary-color, #4f46e5);
+  background: var(--primary-soft, #e9f0f2);
+  color: var(--primary-color, #2f5d6b);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .ledger-action-btn.ghost {
   background: #fff;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
+  color: var(--text-sub, #64748B);
+  border: 1px solid var(--line-hairline, #E2E8F0);
 }
 </style>
+import AppIcon from '../common/AppIcon.vue'

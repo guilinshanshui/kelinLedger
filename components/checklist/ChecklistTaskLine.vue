@@ -2,6 +2,7 @@
   <view
     class="task-line"
     :class="[
+      themeClass,
       lineClass,
       {
         'is-last': isLast,
@@ -20,10 +21,10 @@
       :class="{ checked: completingId === task.id }"
       @tap.stop="$emit('complete', task)"
     >
-      <text v-if="completingId === task.id" class="check-mark">✓</text>
+      <AppIcon v-if="completingId === task.id" name="check-2" :size="13" color="#FFFFFF" />
     </view>
     <view v-else class="line-check checked static-check done-check">
-      <text class="check-mark">✓</text>
+      <AppIcon name="check-2" :size="13" color="#FFFFFF" />
     </view>
 
     <view class="line-body" :class="{ 'line-body-dim': completingId === task.id }">
@@ -81,7 +82,11 @@
 
 <script setup>
 import { computed } from 'vue'
+import AppIcon from '../common/AppIcon.vue'
 import { coalesce } from '@/common/utils/coalesce.js'
+import { useAppTheme } from '@/common/themes/useAppTheme.js'
+
+const { themeClass } = useAppTheme()
 
 const props = defineProps({
   task: { type: Object, required: true },
@@ -153,6 +158,7 @@ const staggerStyle = computed(() =>
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
 .task-line {
   position: relative;
   display: flex;
@@ -193,8 +199,8 @@ const staggerStyle = computed(() =>
   background: rgba(255, 255, 255, 0.9);
   z-index: 3;
   font-size: 13px;
-  font-weight: 800;
-  color: #10b981;
+  font-weight: 600;
+  color: var(--color-income, #10B981);
   letter-spacing: 1px;
   animation: completeBadgeIn 0.22s ease;
 }
@@ -213,7 +219,7 @@ const staggerStyle = computed(() =>
   width: 20px;
   height: 20px;
   border-radius: 7px;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--text-faint, #CBD5E1);
   flex-shrink: 0;
   margin-top: 2px;
   display: flex;
@@ -222,8 +228,8 @@ const staggerStyle = computed(() =>
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .line-check.checked {
-  border-color: #10b981;
-  background: #10b981;
+  border-color: var(--color-income, #10B981);
+  background: var(--color-income, #10B981);
 }
 .line-check.done-check {
   width: 22px;
@@ -233,18 +239,12 @@ const staggerStyle = computed(() =>
   box-shadow: none;
 }
 .task-line.bucket-completed .line-check.checked {
-  border-color: #10b981;
-  background: #10b981;
+  border-color: var(--color-income, #10B981);
+  background: var(--color-income, #10B981);
 }
 .line-check.static-check { pointer-events: none; }
-.check-mark {
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-}
 .line-body-dim { position: relative; z-index: 1; transition: opacity 0.2s ease; }
-.line-check:active:not(.checked):not(.static-check) { border-color: #10b981; background: #d1fae5; }
+.line-check:active:not(.checked):not(.static-check) { border-color: var(--color-income, #10B981); background: var(--color-income-soft, #D1FAE5); }
 
 .line-body {
   flex: 1;
@@ -268,7 +268,7 @@ const staggerStyle = computed(() =>
   margin-left: auto;
 }
 .task-title {
-  color: #1f2937;
+  color: var(--text-ink, #1F2937);
   font-size: 15px;
   font-weight: 600;
   flex: 1;
@@ -281,7 +281,7 @@ const staggerStyle = computed(() =>
 .task-amount {
   font-size: 14px;
   font-weight: 600;
-  color: #059669;
+  color: var(--color-income, #059669);
   line-height: 1;
   text-align: right;
   flex-shrink: 0;
@@ -297,7 +297,7 @@ const staggerStyle = computed(() =>
 .task-meta-text {
   font-size: 11px;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -308,14 +308,14 @@ const staggerStyle = computed(() =>
 .task-meta-sep {
   font-size: 11px;
   font-weight: 400;
-  color: #cbd5e1;
+  color: var(--text-faint, #CBD5E1);
   line-height: 1.35;
   flex-shrink: 0;
 }
 .task-meta-ledger {
   font-size: 11px;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
   line-height: 1.35;
   flex-shrink: 0;
 }
@@ -329,21 +329,21 @@ const staggerStyle = computed(() =>
 .task-schedule-urgent {
   font-size: 11px;
   font-weight: 600;
-  color: #e11d48;
+  color: var(--color-expense, #E11D48);
   line-height: 1.35;
   flex-shrink: 0;
 }
 .task-schedule-sep {
   font-size: 11px;
   font-weight: 400;
-  color: #cbd5e1;
+  color: var(--text-faint, #CBD5E1);
   line-height: 1.35;
   flex-shrink: 0;
 }
 .task-schedule-date {
   font-size: 11px;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -352,13 +352,13 @@ const staggerStyle = computed(() =>
   min-width: 0;
 }
 .task-schedule-date.overdue {
-  color: #dc2626;
+  color: var(--color-expense, #DC2626);
 }
 .task-note-line {
   display: block;
   font-size: 11px;
   font-weight: 400;
-  color: #a8b3c3;
+  color: var(--text-faint, #A8B3C3);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -366,7 +366,7 @@ const staggerStyle = computed(() =>
 }
 .line-more {
   font-size: 16px;
-  color: #cbd5e1;
+  color: var(--text-faint, #CBD5E1);
   font-weight: 400;
   line-height: 1;
   padding: 0 2px;

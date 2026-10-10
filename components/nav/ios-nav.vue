@@ -87,6 +87,8 @@ const handleBack=()=>{
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .ios-nav-bar {
   position: fixed;
   top: 0;
@@ -100,8 +102,6 @@ const handleBack=()=>{
   padding-left: 16px;
   padding-right: 16px;
   background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(25px) saturate(180%);
-  -webkit-backdrop-filter: blur(25px) saturate(180%);
   z-index: 1000;
   border-bottom: 1rpx solid rgba(0, 0, 0, 0.03);
 }
@@ -123,7 +123,7 @@ const handleBack=()=>{
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
 }
 .single-back-btn:active {
   transform: scale(0.9);
@@ -152,7 +152,7 @@ const handleBack=()=>{
   height: 100%;
   padding: 0 12px;
   border-radius: 100px;
-  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
 }
 .capsule-btn:active {
   background: rgba(0, 0, 0, 0.05);
@@ -166,8 +166,8 @@ const handleBack=()=>{
 
 .btn-label {
   font-size: 13px;
-  font-weight: 900;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
   margin-left: 6px;
   white-space: nowrap;
 }
@@ -193,9 +193,9 @@ const handleBack=()=>{
 
 .nav-title {
   font-size: 17px;
-  font-weight: 900;
-  color: #1E293B;
-  letter-spacing: -0.5px;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
+  letter-spacing: 0;
 }
 
 .nav-side.right {
@@ -205,19 +205,19 @@ const handleBack=()=>{
 .flat-action-btn {
   width: 36px;
   height: 36px;
-  background: var(--primary-soft, #EEF2FF);
+  background: var(--primary-soft, #E9F0F2);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.35s ease;
 }
-.nav-icon-emoji { font-size: 18px; color: var(--primary-color, #4F46E5); font-weight: 900; }
+.nav-icon-emoji { font-size: 18px; color: var(--primary-color, #2F5D6B); font-weight: 600; }
 
 .nav-text {
   font-size: 15px;
-  font-weight: 800;
-  color: var(--primary-color, #4F46E5);
+  font-weight: 600;
+  color: var(--primary-color, #2F5D6B);
 }
 
 .nav-placeholder {

@@ -27,7 +27,7 @@
           <picker mode="date" :start="todayStr" :value="pickerDate" @change="onDateChange">
             <view class="picker-card-option">
               <view class="pc-left">
-                <text class="pc-emoji">📅</text>
+                <AppIcon name="calendar-2" :size="18" />
                 <text class="pc-label">设定日期</text>
               </view>
               <text class="pc-val">{{ pickerDate }}</text>
@@ -45,7 +45,7 @@
               :class="{ active: form.birthdayCalendar === 'solar' }"
               @click="setBirthdayCalendar('solar')"
             >
-              <text class="calendar-type-icon">☀️</text>
+              <AppIcon name="sun" :size="18" />
               <text class="calendar-type-text">公历生日</text>
             </view>
             <view
@@ -53,7 +53,7 @@
               :class="{ active: form.birthdayCalendar === 'lunar' }"
               @click="setBirthdayCalendar('lunar')"
             >
-              <text class="calendar-type-icon">🌙</text>
+              <AppIcon name="moon" :size="18" />
               <text class="calendar-type-text">农历生日</text>
             </view>
           </view>
@@ -70,7 +70,7 @@
           >
             <view class="birthday-picker-card">
               <view class="birthday-picker-left">
-                <text class="birthday-picker-emoji">📅</text>
+                <AppIcon name="calendar-2" :size="18" />
                 <view class="birthday-picker-copy">
                   <text class="birthday-picker-title">选择日期</text>
                   <text class="birthday-picker-sub">按公历记录</text>
@@ -92,7 +92,7 @@
             >
               <view class="birthday-picker-card lunar-card">
                 <view class="birthday-picker-left">
-                  <text class="birthday-picker-emoji">🌙</text>
+                  <AppIcon name="moon" :size="18" />
                   <view class="birthday-picker-copy">
                     <text class="birthday-picker-title">选择农历生日</text>
                     <text class="birthday-picker-sub">按农历月日记录</text>
@@ -125,7 +125,7 @@
       <view class="remind-section" :class="{ 'remind-section-off': !form.remindEnabled }">
         <view class="remind-head">
           <view class="remind-head-left">
-            <text class="remind-icon">🔔</text>
+            <AppIcon name="notification" :size="18" />
             <view>
               <text class="remind-title">提醒设置</text>
               <text class="remind-sub">开启后会在通知中心提醒你</text>
@@ -150,7 +150,7 @@
             >
               <view class="picker-card-option">
                 <view class="pc-left">
-                  <text class="pc-emoji">⏰</text>
+                  <AppIcon name="clock-2" :size="18" />
                   <text class="pc-label">提醒时间</text>
                 </view>
                 <text class="pc-val">{{ form.remindTime }}</text>
@@ -184,7 +184,7 @@
               @click="toggleRemindChannel(REMIND_CHANNEL_IN_APP)"
             >
               <view class="channel-check" :class="{ checked: inAppChannelSelected }">
-                <text v-if="inAppChannelSelected" class="channel-check-icon">✓</text>
+                <AppIcon v-if="inAppChannelSelected" name="check-2" :size="14" color="#FFFFFF" />
               </view>
               <view class="channel-copy">
                 <text class="channel-title">小程序内提醒</text>
@@ -202,7 +202,7 @@
               @click="toggleRemindChannel(REMIND_CHANNEL_WECHAT)"
             >
               <view class="channel-check" :class="{ checked: wechatChannelSelected }">
-                <text v-if="wechatChannelSelected" class="channel-check-icon">✓</text>
+                <AppIcon v-if="wechatChannelSelected" name="check-2" :size="14" color="#FFFFFF" />
               </view>
               <view class="channel-copy">
                 <text class="channel-title">微信生日提醒</text>
@@ -288,7 +288,7 @@ import {
   shouldShowBirthdayWechatChannel
 } from '@/common/utils/wechatSubscribe.js';
 
-const { themeClass, primaryColor } = useAppTheme();
+const { themeClass, primaryColor, expenseColor } = useAppTheme();
 
 const props = defineProps({
   modelValue: Boolean,
@@ -738,7 +738,7 @@ const handleDelete = () => {
   uni.showModal({
     title: '确认删除',
     content: form.type === 'birthday' ? '确定删除这条生日记录吗？' : '确定删除这条日程吗？',
-    confirmColor: '#F43F5E',
+    confirmColor: expenseColor.value,
     success: (res) => {
       if (!res.confirm) return;
       emit('delete', { id: form.id, type: form.type });
@@ -749,6 +749,8 @@ const handleDelete = () => {
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .schedule-form-body {
   padding-top: 4px;
 }
@@ -759,8 +761,8 @@ const handleDelete = () => {
 
 .modal-label {
   font-size: 11px;
-  font-weight: 900;
-  color: #CBD5E1;
+  font-weight: 600;
+  color: var(--text-faint, #CBD5E1);
   margin-bottom: 14px;
   display: block;
   text-transform: uppercase;
@@ -771,14 +773,14 @@ const handleDelete = () => {
   background: #fff;
   border-radius: 16px;
   padding: 14px 16px;
-  border: 1px solid var(--primary-soft, #eef2ff);
+  border: 1px solid var(--primary-soft, #e9f0f2);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
   box-sizing: border-box;
 }
 
 .field-shell-focus {
-  border-color: var(--primary-color, #4f46e5);
-  box-shadow: 0 8px 20px var(--primary-glow, rgba(79, 70, 229, 0.1));
+  border-color: var(--primary-color, #2f5d6b);
+  box-shadow: 0 8px 20px var(--primary-glow, rgba(47, 93, 107, 0.1));
 }
 
 .title-input-card {
@@ -789,8 +791,8 @@ const handleDelete = () => {
   width: 100%;
   min-height: 28px;
   font-size: 20px;
-  font-weight: 900;
-  color: #1E293B;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
   line-height: 1.4;
 }
 
@@ -806,7 +808,7 @@ const handleDelete = () => {
 }
 
 .picker-card-option:active {
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
 }
 
 .pc-left {
@@ -821,14 +823,14 @@ const handleDelete = () => {
 
 .pc-label {
   font-size: 15px;
-  font-weight: 800;
-  color: #475569;
+  font-weight: 600;
+  color: var(--text-sub, #475569);
 }
 
 .pc-val {
   font-size: 15px;
-  font-weight: 900;
-  color: var(--primary-color, #4F46E5);
+  font-weight: 600;
+  color: var(--primary-color, #2F5D6B);
 }
 
 .calendar-type-row {
@@ -842,18 +844,18 @@ const handleDelete = () => {
   padding: 14px 16px;
   border-radius: 20px;
   background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
+  border: 1.5px solid var(--line-hairline, #E2E8F0);
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 6px;
-  transition: all 0.22s ease;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
 }
 
 .calendar-type-chip.active {
-  background: var(--primary-soft, #eef2ff);
-  border-color: var(--primary-color, #4F46E5);
-  box-shadow: 0 8px 20px var(--primary-glow, rgba(79, 70, 229, 0.12));
+  background: var(--primary-soft, #e9f0f2);
+  border-color: var(--primary-color, #2F5D6B);
+  box-shadow: 0 8px 20px var(--primary-glow, rgba(47, 93, 107, 0.12));
 }
 
 .calendar-type-icon {
@@ -863,12 +865,12 @@ const handleDelete = () => {
 
 .calendar-type-text {
   font-size: 15px;
-  font-weight: 900;
-  color: #475569;
+  font-weight: 600;
+  color: var(--text-sub, #475569);
 }
 
 .calendar-type-chip.active .calendar-type-text {
-  color: var(--primary-color, #4F46E5);
+  color: var(--primary-color, #2F5D6B);
 }
 
 .birthday-picker-card {
@@ -880,11 +882,11 @@ const handleDelete = () => {
   padding: 16px 18px;
   background: #F8FAFC;
   border-radius: 20px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--line-hairline, #E2E8F0);
 }
 
 .birthday-picker-card:active {
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
 }
 
 .birthday-picker-card.lunar-card {
@@ -912,13 +914,13 @@ const handleDelete = () => {
 
 .birthday-picker-title {
   font-size: 15px;
-  font-weight: 800;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
 }
 
 .birthday-picker-sub {
   font-size: 12px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 .birthday-picker-right {
@@ -930,14 +932,14 @@ const handleDelete = () => {
 
 .birthday-picker-value {
   font-size: 16px;
-  font-weight: 900;
-  color: var(--primary-color, #4F46E5);
+  font-weight: 600;
+  color: var(--primary-color, #2F5D6B);
 }
 
 .birthday-picker-arrow {
   font-size: 22px;
   line-height: 1;
-  color: #CBD5E1;
+  color: var(--text-faint, #CBD5E1);
   font-weight: 300;
 }
 
@@ -947,47 +949,47 @@ const handleDelete = () => {
   padding: 8px 14px;
   border-radius: 999px;
   background: #F1F5F9;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--line-hairline, #E2E8F0);
 }
 
 .leap-month-chip.active {
   background: #FAF5FF;
-  border-color: #C4B5FD;
+  border-color: var(--primary-soft, #C4B5FD);
 }
 
 .leap-month-chip-text {
   font-size: 13px;
-  font-weight: 800;
-  color: #64748B;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
 }
 
 .leap-month-chip.active .leap-month-chip-text {
-  color: #7C3AED;
+  color: var(--secondary-color, #416F7B);
 }
 
 .birthday-record-card {
   margin-bottom: 20px;
   padding: 16px 18px;
   border-radius: 20px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--line-hairline, #E2E8F0);
   background: #FCFCFD;
 }
 
 .birthday-record-solar {
-  background: linear-gradient(135deg, #EEF2FF 0%, #FCFCFD 100%);
-  border-color: #C7D2FE;
+  background: linear-gradient(135deg, var(--primary-soft, #E9F0F2) 0%, #FCFCFD 100%);
+  border-color: var(--primary-soft, #C7D2FE);
 }
 
 .birthday-record-lunar {
   background: linear-gradient(135deg, #FAF5FF 0%, #FCFCFD 100%);
-  border-color: #DDD6FE;
+  border-color: var(--primary-soft, #E9F0F2);
 }
 
 .birthday-record-label {
   display: block;
   font-size: 11px;
-  font-weight: 800;
-  color: #94A3B8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   letter-spacing: 1px;
   text-transform: uppercase;
 }
@@ -996,8 +998,8 @@ const handleDelete = () => {
   display: block;
   margin-top: 8px;
   font-size: 18px;
-  font-weight: 900;
-  color: #1E293B;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
 }
 
 .birthday-record-hint {
@@ -1005,7 +1007,7 @@ const handleDelete = () => {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.55;
-  color: #64748B;
+  color: var(--text-sub, #64748B);
 }
 
 .remind-section {
@@ -1043,15 +1045,15 @@ const handleDelete = () => {
 .remind-title {
   display: block;
   font-size: 15px;
-  font-weight: 800;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
 }
 
 .remind-sub {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 .remind-body.disabled {
@@ -1081,17 +1083,17 @@ const handleDelete = () => {
 
 .offset-chip text {
   font-size: 13px;
-  font-weight: 700;
-  color: #64748B;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
 }
 
 .offset-chip.active {
-  background: var(--primary-soft, #eef2ff);
-  border-color: var(--primary-color, #4F46E5);
+  background: var(--primary-soft, #e9f0f2);
+  border-color: var(--primary-color, #2F5D6B);
 }
 
 .offset-chip.active text {
-  color: var(--primary-color, #4F46E5);
+  color: var(--primary-color, #2F5D6B);
 }
 
 .offset-chip.disabled {
@@ -1102,13 +1104,13 @@ const handleDelete = () => {
   display: block;
   font-size: 12px;
   line-height: 1.5;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 .channel-section {
   margin-top: 18px;
   padding-top: 18px;
-  border-top: 1px dashed #E2E8F0;
+  border-top: 1px dashed var(--line-hairline, #E2E8F0);
 }
 
 .channel-label {
@@ -1122,19 +1124,19 @@ const handleDelete = () => {
   padding: 14px 16px;
   border-radius: 18px;
   background: #fff;
-  border: 1.5px solid #E2E8F0;
+  border: 1.5px solid var(--line-hairline, #E2E8F0);
   margin-bottom: 10px;
-  transition: all 0.22s ease;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
 }
 
 .channel-row.active {
-  background: var(--primary-soft, #eef2ff);
-  border-color: rgba(79, 70, 229, 0.25);
+  background: var(--primary-soft, #e9f0f2);
+  border-color: rgba(47, 93, 107, 0.25);
 }
 
 .channel-row.wechat-row.active {
-  background: linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%);
-  border-color: #86EFAC;
+  background: linear-gradient(135deg, var(--color-income-soft, #ECFDF5) 0%, var(--color-income-soft, #F0FDF4) 100%);
+  border-color: var(--color-income-soft, #86EFAC);
 }
 
 .channel-row.disabled {
@@ -1143,7 +1145,7 @@ const handleDelete = () => {
 
 .channel-hint-warn {
   color: #B45309;
-  background: #FFFBEB;
+  background: var(--color-warning-soft, #FFFBEB);
   border-radius: 14px;
   padding: 10px 12px;
 }
@@ -1152,7 +1154,7 @@ const handleDelete = () => {
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  border: 1.5px solid #CBD5E1;
+  border: 1.5px solid var(--text-faint, #CBD5E1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1162,21 +1164,15 @@ const handleDelete = () => {
 }
 
 .channel-check.checked {
-  background: var(--primary-color, #4F46E5);
-  border-color: var(--primary-color, #4F46E5);
+  background: var(--primary-color, #2F5D6B);
+  border-color: var(--primary-color, #2F5D6B);
 }
 
 .wechat-row .channel-check.checked {
-  background: #10B981;
-  border-color: #10B981;
+  background: var(--color-income, #10B981);
+  border-color: var(--color-income, #10B981);
 }
 
-.channel-check-icon {
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1;
-}
 
 .channel-copy {
   flex: 1;
@@ -1186,8 +1182,8 @@ const handleDelete = () => {
 .channel-title {
   display: block;
   font-size: 15px;
-  font-weight: 800;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
 }
 
 .channel-desc {
@@ -1195,7 +1191,7 @@ const handleDelete = () => {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 .channel-hint {
@@ -1203,11 +1199,11 @@ const handleDelete = () => {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.55;
-  color: #64748B;
+  color: var(--text-sub, #64748B);
 }
 
 .channel-hint-accent {
-  color: #7C3AED;
+  color: var(--secondary-color, #416F7B);
   background: #FAF5FF;
   border-radius: 14px;
   padding: 10px 12px;
@@ -1232,12 +1228,12 @@ const handleDelete = () => {
   height: 48px;
   margin: 0;
   padding: 0;
-  background: #FFF1F2;
+  background: var(--color-expense-soft, #FFF1F2);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #FECDD3;
+  border: 1px solid var(--color-expense-soft, #FECDD3);
   line-height: 1;
 }
 
@@ -1246,9 +1242,9 @@ const handleDelete = () => {
 }
 
 .delete-btn-txt {
-  color: #F43F5E;
+  color: var(--color-expense, #F43F5E);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .confirm-save-btn {
@@ -1256,14 +1252,14 @@ const handleDelete = () => {
   height: 52px;
   margin: 0;
   padding: 0;
-  background: var(--primary-color, #4F46E5);
+  background: var(--primary-color, #2F5D6B);
   border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   line-height: 1;
-  box-shadow: 0 8px 20px var(--primary-glow, rgba(79, 70, 229, 0.22));
+  box-shadow: 0 8px 20px var(--primary-glow, rgba(47, 93, 107, 0.22));
   transition: background 0.35s ease, box-shadow 0.35s ease, transform 0.2s ease;
 }
 
@@ -1283,7 +1279,8 @@ const handleDelete = () => {
 .btn-txt {
   color: #fff;
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.5px;
 }
 </style>
+import AppIcon from './AppIcon.vue';

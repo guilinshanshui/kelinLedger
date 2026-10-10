@@ -1,4 +1,4 @@
-import dataJson from '/data.json';
+import { hasSession } from '@/common/utils/session'
 /**
  * 邮箱正则
  * @param {Object} email
@@ -154,7 +154,6 @@ export function getTimeStr(ts) {
  * @param {Object} timeStr
  */
 export function toTimestamp(dateStr, timeStr) {
-	console.log("打印时间",dateStr);
   const [year, month, day] = dateStr.split('-').map(Number)
   const [hour, minute] = timeStr.split(':').map(Number)
 
@@ -268,7 +267,7 @@ export const formatRelativeTime = (timestamp) => {
  * 判断是否登录,弹出对话框
  */
 export function isLoginDialog(){
-	if(dataJson.isLogin){
+	if(hasSession()){
 		return true;
 	}
 	uni.showModal({
@@ -288,14 +287,13 @@ export function isLoginDialog(){
 }
 
 export function goToLogin() {
-  if (dataJson.isLogin) {
+  if (hasSession()) {
     return true
   }
 
   // 可选：把邀请码继续带到登录页
   const inviteCode = uni.getStorageSync('inviteCode')
   
-  console.log("打印登录跳转",inviteCode);
 
   uni.navigateTo({
     url: inviteCode
@@ -336,24 +334,16 @@ export function isFormatNumber(num) {
  * 判断是什么平台
  */
 export function isPlatfrom() {
-	if (dataJson.platfrom == 'weixin') {
-		return 1;
-	} else if (dataJson.platfrom == "qq") {
-		return 2;
-	}else if(dataJson.platfrom=='toutiao'){
-		return 3;
-	} else {
-		return 0;
-	}
+	const platform = uni.getSystemInfoSync?.().uniPlatform || ''
+	if (platform === 'mp-weixin') return 1
+	if (platform === 'mp-qq') return 2
+	if (platform === 'mp-toutiao') return 3
+	return 0
 }
 
 export function settitle(title){
-	if(dataJson.platfrom=='toutiao'){
-		if (uni.canIUse('setNavigationBarTitle')) {
-			uni.setNavigationBarTitle({
-				title: title
-			});
-		}
+	if (uni.canIUse('setNavigationBarTitle')) {
+		uni.setNavigationBarTitle({ title })
 	}
 }
 
@@ -410,6 +400,25 @@ export function formatMoney(value) {
   }
 
   return num.toFixed(2)
+}
+
+/**
+ * 紧凑金额，用于账本卡片 / 月度概览这类多列并排的窄区域。
+ * 一万以下保留两位小数并加千分位，超过一万转「万」、超过一亿转「亿」，「
+ * 避免 375px 宽度下三列数字溢出换行。
+ * @returns {string} 0.00 / 3,280.50 / 1.23万 / 1.05亿
+ */
+export function formatMoneyShort(value) {
+  const num = Number(value)
+  if (value === null || value === undefined || value === '' || isNaN(num)) return '0.00'
+
+  const abs = Math.abs(num)
+  if (abs >= 100000000) return `${(num / 100000000).toFixed(2)}亿`
+  if (abs >= 10000) return `${(num / 10000).toFixed(2)}万`
+
+  // 千分位分隔，保留两位小数
+  const [intPart, decPart] = num.toFixed(2).split('.')
+  return `${intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${decPart}`
 }
 
 export function dateToTimestamp(dateStr) {

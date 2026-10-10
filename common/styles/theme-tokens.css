@@ -1,0 +1,67 @@
+/**
+ * 主题色彩 token（唯一来源）。
+ *
+ * 为什么单独抽成文件：
+ * 微信自定义组件默认 styleIsolation: isolated，真机上 app.wxss 的 `.theme-xxx`
+ * 规则不会进入组件内部，组件里的 var(--primary-color) 会直接落到兜底值，
+ * 表现为「切肤后组件内的颜色不变 / 显示成旧的紫色」。
+ * 因此所有自己带 themeClass 的组件都要 @import 这份文件，
+ * 让变量规则在组件自身的 wxss 里也生效。
+ *
+ * 新增主题色时只改这里，App.vue 通过 @import 复用同一份定义。
+ */
+
+/* A · 黛青（默认） */
+:root,
+.theme-daiqing {
+  --primary-color: #2F5D6B;
+  --primary-soft: #E9F0F2;
+  --primary-glow: rgba(47, 93, 107, 0.18);
+  --secondary-color: #416F7B;
+
+  --bg-page: #F6F8F8;
+  --line-hairline: #E8EEEF;
+  --line-soft: #F1F5F5;
+
+  /* 文字阶：四档都按 WCAG 对比度选值，末两档也不再「看不见」 */
+  --text-ink: #1E293B;      /* 白底 14.63:1 / 浅底 12.69:1 */
+  --text-sub: #4E5F74;      /* 白底  6.54:1 / 浅底  5.67:1 */
+  --text-muted: #5D6E84;    /* 白底  5.21:1 / 浅底  4.52:1 */
+  --text-faint: #66788D;    /* 白底  4.53:1 / 浅底  3.93:1 */
+
+  /* 语义色：支出/收入全局不复用为装饰色 */
+  --color-expense: #B84A42;
+  --color-income: #317F62;
+  --color-expense-soft: #F6E7E5;
+  --color-income-soft: #E6F0EB;
+  /* 危险操作（退出登录 / 解散账本）用淡红，和支出红区分开 */
+  --color-danger: #C9564F;
+  /* 警示文案（超支、导入异常）：不能用纯 amber，白底基本看不清 */
+  --color-warning: #B45309;
+  --color-warning-soft: #FFFBEB;
+}
+
+/* B · 暖赭 */
+.theme-nuanzhe {
+  --primary-color: #6F5643;
+  --primary-soft: #F3EDE7;
+  --primary-glow: rgba(111, 86, 67, 0.18);
+  --secondary-color: #8A6B53;
+
+  --bg-page: #FAF7F3;
+  --line-hairline: #EFE8E0;
+  --line-soft: #F7F2EC;
+
+  --text-ink: #2E2A26;      /* 白底 14.23:1 / 浅底 12.25:1 */
+  --text-sub: #665D55;      /* 白底  6.44:1 / 浅底  5.54:1 */
+  --text-muted: #746A60;    /* 白底  5.29:1 / 浅底  4.55:1 */
+  --text-faint: #80746A;    /* 白底  4.54:1 / 浅底  3.91:1 */
+
+  --color-expense: #A9483F;
+  --color-income: #3F7D5B;
+  --color-expense-soft: #F7E7E4;
+  --color-income-soft: #E8F0E9;
+  --color-danger: #BE4F48;
+  --color-warning: #A94A08;
+  --color-warning-soft: #FDF6EC;
+}

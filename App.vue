@@ -4,35 +4,54 @@
 </template>
 
 <script>
-import { ref, provide } from 'vue'
 import { useUserStore } from '@/store/user'
-import data from '@/data.json'
-import { initAppThemeOnLaunch, setAppThemeId } from '@/common/themes/appTheme'
+import { applyTabBarTheme, getAppThemeById, getStoredAppThemeId, initAppThemeOnLaunch, setAppThemeId } from '@/common/themes/appTheme'
+import { initCloud, isCloudAvailable } from '@/common/utils/cloud'
 
-const globalData = ref({
-  data,
-  isPlatfrom: ''
-})
 
-provide('globalData', globalData)
-
-if (uni.getStorageSync('userInfo')) {
-  globalData.value.data.userInfo = uni.getStorageSync('userInfo')
-  globalData.value.data.isLogin = true
+/** 同步小程序原生 tabBar 的选中色；H5 端不支持时静默跳过 */
+function syncNativeTheme(id) {
+  const theme = getAppThemeById(id)
+  // 选中图标是静态 PNG，不会跟随 CSS 变量，需要换一套同主题色的
+  applyTabBarTheme(id)
+  if (typeof uni.setTabBarStyle !== 'function') return
+  try {
+    uni.setTabBarStyle({
+      color: '#94A3B8',
+      selectedColor: theme.primary,
+      backgroundColor: '#FFFFFF',
+      borderStyle: 'white',
+      fail: () => {}
+    })
+  } catch (error) {
+    console.warn('同步 tabBar 主题色失败：', error)
+  }
 }
+
 
 export default {
   onLaunch() {
-    console.log('App Launch')
+    // 初始化微信云开发（H5 端会自动跳过）
+    initCloud()
 
     const userStore = useUserStore()
+    // 先恢复本机登录态：本机存有 openid 身份才算已登录。
     userStore.initUser()
+    // 只有「本机曾经登录过」才静默刷新云端资料；
+    // 新设备 / 新微信号一律由 pages/index 引导到登录页，这里绝不静默建档。
+    if (isCloudAvailable() && userStore.isLoggedIn) {
+      userStore.refreshProfile().catch((error) => {
+        console.warn('[auth] 资料刷新失败', error)
+      })
+    }
 
     const themeId = initAppThemeOnLaunch()
+    syncNativeTheme(themeId)
     uni.$emit('update_theme', themeId)
 
     uni.$on('update_theme', (id) => {
       setAppThemeId(id, { emit: false })
+      syncNativeTheme(id)
     })
 
     // #ifdef MP-WEIXIN
@@ -66,59 +85,33 @@ export default {
   },
 
   onShow() {
-    console.log('App Show')
+    syncNativeTheme(getStoredAppThemeId())
   },
 
   onHide() {
-    console.log('App Hide')
   }
 }
 </script>
 
 <style>
-/* --- 主题变量定义池（与 ThemePickerModal 的 id 对应）--- */
+/* --- 主题变量定义池（与 common/themes/appTheme.ts 一一对应）--- */
+
+/* 主题色 token 抽到 common/styles/theme-tokens.css，组件端同样 @import 该文件，
+   避免真机上自定义组件拿不到变量而回落到旧兜底色。 */
+@import './common/styles/theme-tokens.css';
 
 :root,
-.theme-indigo {
-  --primary-color: #4F46E5;
-  --primary-soft: #EEF2FF;
-  --primary-glow: rgba(79, 70, 229, 0.2);
-  --secondary-color: #7C3AED;
-}
+page {
+  /* ===== 全局设计 token（DESIGN.md 唯一刻度）=====
+     新增样式必须引用变量，不要另写近似值。 */
 
-.theme-emerald {
-  --primary-color: #10B981;
-  --primary-soft: #ECFDF5;
-  --primary-glow: rgba(16, 185, 129, 0.2);
-  --secondary-color: #059669;
-}
+  /* 圆角只允许这四档 */
+  --radius-sm: 8px;      /* 图标底、条形槽、小标签 */
+  --radius-md: 12px;     /* 标准卡片 */
+  --radius-lg: 16px;     /* 弹窗、大面积容器 */
+  --radius-pill: 999px;  /* 胶囊按钮 */
 
-.theme-rose {
-  --primary-color: #F43F5E;
-  --primary-soft: #FFF1F2;
-  --primary-glow: rgba(244, 63, 94, 0.2);
-  --secondary-color: #E11D48;
-}
-
-.theme-amber {
-  --primary-color: #F59E0B;
-  --primary-soft: #FFFBEB;
-  --primary-glow: rgba(245, 158, 11, 0.2);
-  --secondary-color: #D97706;
-}
-
-.theme-midnight {
-  --primary-color: #1E293B;
-  --primary-soft: #F1F5F9;
-  --primary-glow: rgba(30, 41, 59, 0.2);
-  --secondary-color: #0F172A;
-}
-
-.theme-violet {
-  --primary-color: #8B5CF6;
-  --primary-soft: #F5F3FF;
-  --primary-glow: rgba(139, 92, 246, 0.2);
-  --secondary-color: #7C3AED;
+  --bg-card: #FFFFFF;
 }
 
 .app-root {
@@ -127,9 +120,13 @@ export default {
 
 /* --- 全局基础样式 --- */
 page {
-  background-color: #F8FAFC;
-  color: #1E293B;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-page, #F6F8F8);
+  color: var(--text-ink, #1E293B);
+  /* 中文系统字体栈：零体积、渲染最优；不引入中文 webfont */
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 
 .animate-fade-in {
@@ -144,6 +141,23 @@ page {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* 全站统一的减弱动效降级：系统开启后只保留必要的状态反馈 */
+@media (prefers-reduced-motion: reduce) {
+  page,
+  view,
+  text,
+  button,
+  input,
+  textarea,
+  image,
+  scroll-view,
+  .animate-fade-in {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 </style>

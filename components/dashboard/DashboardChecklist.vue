@@ -28,7 +28,7 @@
         <view class="toolbar-actions">
           <view class="bell-anchor">
             <view class="tool-btn" @tap.stop="toggleReminders">
-              <text class="tool-icon">🔔</text>
+              <AppIcon name="notification" :size="18" />
               <view v-if="hasUnread" class="unread-dot"></view>
             </view>
           </view>
@@ -146,13 +146,13 @@
 
     <view v-if="ledgerPrompt" class="ledger-prompt-wrap animate-pop-in" @tap="dismissLedgerPrompt">
       <view class="ledger-prompt-card" @tap.stop>
-        <view class="lp-icon">💰</view>
+        <view class="lp-icon"><AppIcon name="receive-money" :size="20" /></view>
         <view class="lp-content">
           <text class="lp-h">顺手记一笔？</text>
           <text class="lp-p">「{{ ledgerPromptTitle }}」可能涉及消费</text>
         </view>
         <view class="lp-btn" @tap="goToAddEntry">去记账</view>
-        <view class="lp-close" @tap="dismissLedgerPrompt">✕</view>
+        <view class="lp-close" @tap="dismissLedgerPrompt"><AppIcon name="close" :size="14" color="#64748B" /></view>
       </view>
     </view>
 
@@ -171,7 +171,7 @@
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 const { themeClass } = useAppTheme()
 
-import { ref, onMounted, onUnmounted, computed, getCurrentInstance, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, getCurrentInstance, nextTick, watch } from 'vue'
 import { roomApi, taskApi } from '../../common/api'
 import { formatRelativeTime, getDateStr, normalizeTaskDueDate, toTaskDueDateTimestamp } from '../../pages/js/utils.js'
 import {
@@ -189,7 +189,9 @@ const CONSUME_KEYWORDS = ['买', '购', '付', '费', '支', '花', '交', '定'
 
 const props = defineProps({
   roomId: { type: [String, Number], default: '' },
-  accountId: { type: [String, Number], default: '' }
+  accountId: { type: [String, Number], default: '' },
+  // 看板页已经在并行拉成员了，这里优先复用，避免同一个接口请求两次
+  members: { type: Array, default: () => [] }
 })
 
 const isLoading = ref(true)
@@ -440,7 +442,9 @@ async function loadBoardData(silent = false) {
   try {
     const [listRes, allRes] = await Promise.all([
       taskApi.getTaskList({ roomId: props.roomId }),
-      taskApi.taskAllList({ roomId: props.roomId })
+      taskApi.taskAllList({ roomId: props.roomId }),
+      // 原来这三个请求是「先任务、再汇总」的串行写法，白白多等一次往返
+      loadTaskLedgerSummary()
     ])
     if (listRes?.code == 0) {
       allPending.value = listRes.data?.rows || listRes.data?.list || []
@@ -451,25 +455,35 @@ async function loadBoardData(silent = false) {
       if (pending.length) allPending.value = pending
       overdueList.value = Array.isArray(overdue) ? overdue : []
     }
-    await loadTaskLedgerSummary()
   } finally {
     if (!silent) isLoading.value = false
   }
 }
 
+function applyMembers(list) {
+  roomMembers.value = (list || []).map((m) => ({
+    ...m,
+    label: m.nickname || m.label || '',
+    id: m.userId || m.id,
+    avatar: getMemberAvatar(m)
+  }))
+}
+
 async function loadMembers() {
+  // 复用看板页已经拿到的成员，省掉一次重复请求
+  if (Array.isArray(props.members) && props.members.length) {
+    applyMembers(props.members)
+    return
+  }
   try {
-    const res = await roomApi.getRoomMembers({ roomId: props.roomId })
-    if (res.code == 0) {
-      roomMembers.value = (res.data || []).map(m => ({
-        ...m,
-        label: m.nickname,
-        id: m.userId,
-        avatar: getMemberAvatar(m)
-      }))
-    }
+    const res = await roomApi.getRoomMembers(props.roomId)
+    if (res.code == 0) applyMembers(res.data)
   } catch (e) {}
 }
+
+watch(() => props.members, (val) => {
+  if (Array.isArray(val) && val.length) applyMembers(val)
+})
 
 function onTaskSaved(task) {
   if (task.id) updateTask(task)
@@ -564,7 +578,12 @@ const updateTask = async (task) => {
 }
 
 const handleQuickAdd = async () => {
-  if (!inputTitle.value.trim() || isAdding.value) return
+  if (isAdding.value) return
+  // 空输入时给出反馈，避免用户点「+」后误以为按钮失灵
+  if (!inputTitle.value.trim()) {
+    uni.showToast({ title: '先输入待办内容', icon: 'none' })
+    return
+  }
   isAdding.value = true
   await addTask(null)
 }
@@ -727,6 +746,8 @@ const goToAddEntry = () => {
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .board-root {
   height: 100%;
   display: flex;
@@ -766,22 +787,22 @@ const goToAddEntry = () => {
 }
 .m-val {
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
 }
-.m-val.primary { color: var(--primary-color, #4f46e5); }
-.m-val.urgent { color: #f43f5e; }
-.m-val.overdue { color: #dc2626; }
+.m-val.primary { color: var(--primary-color, #2f5d6b); }
+.m-val.urgent { color: var(--color-expense, #F43F5E); }
+.m-val.overdue { color: var(--color-expense, #DC2626); }
 .m-lbl {
   font-size: 11px;
-  font-weight: 700;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
 }
 .m-divider {
   width: 1px;
   height: 22px;
-  background: #e2e8f0;
+  background: var(--line-hairline, #E2E8F0);
   flex-shrink: 0;
 }
 .toolbar-actions {
@@ -797,7 +818,7 @@ const goToAddEntry = () => {
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -809,8 +830,8 @@ const goToAddEntry = () => {
 .tool-icon { font-size: 15px; }
 .tool-label {
   font-size: 12px;
-  font-weight: 800;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
 }
 .unread-dot {
   position: absolute;
@@ -818,7 +839,7 @@ const goToAddEntry = () => {
   right: 4px;
   width: 7px;
   height: 7px;
-  background: #f43f5e;
+  background: var(--color-expense, #F43F5E);
   border-radius: 50%;
   border: 1.5px solid #fff;
 }
@@ -842,13 +863,13 @@ const goToAddEntry = () => {
 }
 .tle-title {
   font-size: 14px;
-  font-weight: 800;
-  color: #1f2937;
+  font-weight: 600;
+  color: var(--text-ink, #1F2937);
 }
 .tle-arrow {
   font-size: 18px;
   line-height: 1;
-  color: #cbd5e1;
+  color: var(--text-faint, #CBD5E1);
   font-weight: 300;
 }
 .tle-summary-grid {
@@ -862,31 +883,31 @@ const goToAddEntry = () => {
 .tle-summary-label {
   display: block;
   font-size: 11px;
-  font-weight: 700;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   margin-bottom: 6px;
 }
 .tle-summary-amount {
   display: block;
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1.1;
 }
 .tle-summary-amount.primary {
-  color: #1f2937;
+  color: var(--text-ink, #1F2937);
 }
 .tle-summary-amount.expense {
-  color: #ef4444;
+  color: var(--color-expense, #EF4444);
 }
 .tle-summary-amount.income {
-  color: #059669;
+  color: var(--color-income, #059669);
 }
 .tle-summary-meta {
   display: block;
   margin-top: 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
 }
 
 /* 紧凑输入条（与抽屉 field-shell 聚焦态一致） */
@@ -898,8 +919,8 @@ const goToAddEntry = () => {
   box-sizing: border-box;
 }
 .field-shell-focus {
-  border-color: var(--primary-color, #4f46e5);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+  border-color: var(--primary-color, #2f5d6b);
+  box-shadow: 0 0 0 3px rgba(47, 93, 107, 0.08);
 }
 .compose-bar {
   padding: 10px 12px 8px;
@@ -915,7 +936,7 @@ const goToAddEntry = () => {
   flex: 1;
   font-size: 15px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-ink, #1E293B);
   height: 36px;
 }
 .compose-add {
@@ -927,15 +948,15 @@ const goToAddEntry = () => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
 }
 .compose-add.on {
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
 }
 .add-icon {
   font-size: 20px;
   font-weight: 300;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
   line-height: 1;
 }
 .compose-add.on .add-icon { color: #fff; font-weight: 400; }
@@ -948,8 +969,8 @@ const goToAddEntry = () => {
   animation: spin 0.7s linear infinite;
 }
 .mini-spinner.dark {
-  border-color: rgba(79, 70, 229, 0.2);
-  border-top-color: var(--primary-color, #4f46e5);
+  border-color: rgba(47, 93, 107, 0.2);
+  border-top-color: var(--primary-color, #2f5d6b);
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .chip-scroll { width: 100%; white-space: nowrap; }
@@ -958,24 +979,24 @@ const goToAddEntry = () => {
   padding: 4px 12px;
   border-radius: 100px;
   background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line-hairline, #E2E8F0);
   flex-shrink: 0;
 }
 .chip-label {
   font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
 }
 .chip.on {
-  background: var(--primary-soft, #eef2ff);
-  border-color: var(--primary-color, #4f46e5);
+  background: var(--primary-soft, #e9f0f2);
+  border-color: var(--primary-color, #2f5d6b);
 }
-.chip.on .chip-label { color: var(--primary-color, #4f46e5); }
+.chip.on .chip-label { color: var(--primary-color, #2f5d6b); }
 .chip-urgent.on {
-  background: #fff1f2;
-  border-color: #fecdd3;
+  background: var(--color-expense-soft, #FFF1F2);
+  border-color: var(--color-expense-soft, #FECDD3);
 }
-.chip-urgent.on .chip-label { color: #f43f5e; }
+.chip-urgent.on .chip-label { color: var(--color-expense, #F43F5E); }
 .chip-ghost { background: transparent; border-style: dashed; }
 
 .board-scroll { flex: 1; height: 0; z-index: 1; }
@@ -997,8 +1018,8 @@ const goToAddEntry = () => {
 }
 .panel-footer text {
   font-size: 12px;
-  font-weight: 700;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
 }
 .footer-arrow { opacity: 0.6; }
 
@@ -1007,9 +1028,9 @@ const goToAddEntry = () => {
   text-align: center;
   background: #fff;
   border-radius: 16px;
-  border: 1px dashed #e2e8f0;
+  border: 1px dashed var(--line-hairline, #E2E8F0);
 }
-.empty-t { font-size: 13px; font-weight: 600; color: #94a3b8; }
+.empty-t { font-size: 13px; font-weight: 600; color: var(--text-muted, #94A3B8); }
 
 .center-link {
   margin-top: 12px;
@@ -1019,10 +1040,10 @@ const goToAddEntry = () => {
   gap: 6px;
   padding: 14px 0;
 }
-.link-title { font-size: 13px; font-weight: 800; color: #64748b; }
-.link-dot { color: #cbd5e1; font-size: 12px; }
-.link-sub { font-size: 12px; font-weight: 600; color: #94a3b8; }
-.link-arrow { font-size: 14px; color: var(--primary-color, #4f46e5); margin-left: 2px; }
+.link-title { font-size: 13px; font-weight: 600; color: var(--text-sub, #64748B); }
+.link-dot { color: var(--text-faint, #CBD5E1); font-size: 12px; }
+.link-sub { font-size: 12px; font-weight: 600; color: var(--text-muted, #94A3B8); }
+.link-arrow { font-size: 14px; color: var(--primary-color, #2f5d6b); margin-left: 2px; }
 .center-link:active { opacity: 0.7; }
 
 .bottom-safe-spacer { height: 72px; }
@@ -1032,7 +1053,7 @@ const goToAddEntry = () => {
   background: #fff;
   border-radius: 16px;
   padding: 18px 16px;
-  border: 1px solid var(--primary-soft, #eef2ff);
+  border: 1px solid var(--primary-soft, #e9f0f2);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
   z-index: 2002;
   box-sizing: border-box;
@@ -1044,25 +1065,25 @@ const goToAddEntry = () => {
   height: 14px;
   background: #fff;
   transform: rotate(45deg);
-  border-left: 1px solid var(--primary-soft, #eef2ff);
-  border-top: 1px solid var(--primary-soft, #eef2ff);
+  border-left: 1px solid var(--primary-soft, #e9f0f2);
+  border-top: 1px solid var(--primary-soft, #e9f0f2);
 }
 .popup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.p-title { font-size: 14px; font-weight: 900; color: #1e293b; }
-.p-clear { font-size: 11px; font-weight: 700; color: var(--primary-color, #4f46e5); }
+.p-title { font-size: 14px; font-weight: 600; color: var(--text-ink, #1E293B); }
+.p-clear { font-size: 11px; font-weight: 600; color: var(--primary-color, #2f5d6b); }
 .reminder-list { max-height: 260px; }
 .reminder-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
 .reminder-item:last-child { border-bottom: none; }
 .r-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-.r-dot.unread { background: var(--primary-color, #4f46e5); }
+.r-dot.unread { background: var(--primary-color, #2f5d6b); }
 .r-body { flex: 1; min-width: 0; }
-.r-txt { font-size: 12px; font-weight: 700; color: #334155; line-height: 1.4; }
-.r-time { font-size: 10px; color: #94a3b8; display: block; margin-top: 2px; }
+.r-txt { font-size: 12px; font-weight: 600; color: var(--text-ink, #334155); line-height: 1.4; }
+.r-time { font-size: 10px; color: var(--text-muted, #94A3B8); display: block; margin-top: 2px; }
 .empty-notif { padding: 16px 0; text-align: center; }
-.empty-notif-txt { font-size: 12px; color: #cbd5e1; font-weight: 700; }
+.empty-notif-txt { font-size: 12px; color: var(--text-faint, #CBD5E1); font-weight: 600; }
 .ledger-prompt-wrap { position: fixed; left: 20px; right: 20px; bottom: 100px; z-index: 3000; }
 .ledger-prompt-card {
-  background: #1e293b;
+  background: var(--text-ink, #1E293B);
   border-radius: 22px;
   padding: 16px 18px;
   display: flex;
@@ -1073,11 +1094,11 @@ const goToAddEntry = () => {
 }
 .lp-icon { font-size: 24px; flex-shrink: 0; }
 .lp-content { flex: 1; min-width: 0; }
-.lp-h { font-size: 15px; font-weight: 900; color: #fff; display: block; }
+.lp-h { font-size: 15px; font-weight: 600; color: #fff; display: block; }
 .lp-p {
   font-size: 11px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
   display: block;
   margin-top: 2px;
   overflow: hidden;
@@ -1085,27 +1106,27 @@ const goToAddEntry = () => {
   white-space: nowrap;
 }
 .lp-btn {
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   color: #fff;
   padding: 8px 14px;
   border-radius: 12px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   flex-shrink: 0;
 }
-.lp-close { position: absolute; top: 8px; right: 10px; font-size: 11px; color: #64748b; padding: 4px; }
+.lp-close { position: absolute; top: 8px; right: 10px; font-size: 11px; color: var(--text-sub, #64748B); padding: 4px; }
 .animate-fade-in { animation: fadeIn 0.45s ease both; }
-.animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.19, 1, 0.22, 1) both; }
-.animate-stagger-in { animation: staggerIn 0.5s cubic-bezier(0.19, 1, 0.22, 1) both; }
-.animate-dropdown { animation: dropDown 0.3s cubic-bezier(0.19, 1, 0.22, 1) both; }
-.animate-pop-in { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+.animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.animate-stagger-in { animation: staggerIn 0.5s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.animate-dropdown { animation: dropDown 0.3s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.animate-pop-in { animation: popIn 0.38s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes staggerIn { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: none; } }
 @keyframes dropDown { from { opacity: 0; transform: translateY(-8px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes popIn { 0% { transform: scale(0.9) translateY(12px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 .sk-block { border-radius: 18px; margin-bottom: 10px; }
-.shimmer { background: var(--primary-soft, #eef2ff) !important; position: relative; overflow: hidden; }
+.shimmer { background: var(--primary-soft, #e9f0f2) !important; position: relative; overflow: hidden; }
 .shimmer::after {
   position: absolute;
   inset: 0;
@@ -1116,3 +1137,4 @@ const goToAddEntry = () => {
 }
 @keyframes shimmerAnim { 100% { transform: translateX(100%); } }
 </style>
+import AppIcon from '../common/AppIcon.vue'

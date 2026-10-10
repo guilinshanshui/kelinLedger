@@ -44,9 +44,9 @@
 
       <view class="search-row">
         <view class="search-box field-shell">
-          <text class="search-icon">🔍</text>
+          <AppIcon name="search-2" :size="18" />
           <input v-model="searchKey" class="search-input" placeholder="搜索任务、成员、备注" />
-          <view v-if="searchKey" class="clear-search" @tap="searchKey = ''">✕</view>
+          <view v-if="searchKey" class="clear-search" @tap="searchKey = ''"><AppIcon name="close" :size="14" tone="faint" /></view>
         </view>
         <view class="filter-btn" @tap="showFilterPanel = true">筛选</view>
       </view>
@@ -180,7 +180,7 @@
 
     <view v-if="ledgerPrompt" class="ledger-prompt-wrap" @tap="ledgerPrompt = false">
       <view class="ledger-prompt-card" @tap.stop>
-        <view class="lp-icon">💰</view>
+          <view class="lp-icon"><AppIcon name="receive-money" :size="20" /></view>
         <view class="lp-content">
           <text class="lp-h">这项可能产生支出</text>
           <text class="lp-p">「{{ ledgerPromptTitle }}」要记一笔吗？</text>
@@ -198,15 +198,17 @@ const { themeClass } = useAppTheme()
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { onLoad, onUnload, onShow } from '@dcloudio/uni-app'
 import IosNav from '../../components/nav/ios-nav.vue'
+import AppIcon from '../../components/common/AppIcon.vue'
 import BottomPicker from '../../components/common/BottomPicker.vue'
 import ChecklistQuickAdd from '../../components/checklist/ChecklistQuickAdd.vue'
 import ChecklistTaskLine from '../../components/checklist/ChecklistTaskLine.vue'
 import ChecklistTaskDrawer from '../../components/checklist/ChecklistTaskDrawer.vue'
 import { buildDisplayTask, normalizeRoomMember } from '../../common/utils/checklistTaskDisplay.js'
 import { roomApi, taskApi } from '../../common/api'
-import dataJson from '/data.json'
+import { getCurrentUserId } from '@/common/utils/session'
 import { getDateStr, normalizeTaskDueDate, toTaskDueDateTimestamp } from '../js/utils.js'
 import { coalesce, pickApiList } from '@/common/utils/coalesce.js'
+import { goBackSafe } from '@/common/utils/nav.js'
 
 const CONSUME_KEYWORDS = ['买', '购', '付', '费', '支', '花', '交', '定', '餐', '订', '缴', '采购']
 const COMPLETE_SWEEP_MS = 560
@@ -292,11 +294,7 @@ onMounted(async () => {
 })
 
 function syncUserInfo() {
-  if (!dataJson.userInfo) {
-    const saved = uni.getStorageSync('userInfo')
-    if (saved) dataJson.userInfo = saved
-  }
-  currentUserId.value = coalesce(dataJson.userInfo && dataJson.userInfo.userId, null)
+  currentUserId.value = getCurrentUserId() || null
 }
 
 const overdueIdSet = computed(() => new Set(overdueTasks.value.map((t) => String(t.id))))
@@ -409,7 +407,7 @@ async function loadAllTasks() {
 }
 
 async function loadMembers() {
-  const res = await roomApi.getRoomMembers({ roomId: roomId.value })
+  const res = await roomApi.getRoomMembers(roomId.value)
   if (res.code == 0) {
     roomMembers.value = (res.data || []).map(normalizeRoomMember)
   }
@@ -439,7 +437,7 @@ function persistChecklistDirty() {
 
 function goBack() {
   persistChecklistDirty()
-  uni.navigateBack()
+  goBackSafe()
 }
 
 onUnload(() => {
@@ -746,7 +744,7 @@ function handleDrawerAddLedger(task) {
   align-items: center;
   justify-content: space-between;
   background: #fff;
-  border-radius: 18px;
+  border-radius: var(--radius-lg, 16px);
   padding: 10px 12px;
   margin-bottom: 10px;
   border: 1px solid #f1f5f9;
@@ -766,22 +764,22 @@ function handleDrawerAddLedger(task) {
 }
 .m-val {
   font-size: 18px;
-  font-weight: 900;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
   line-height: 1;
 }
-.m-val.primary { color: var(--primary-color, #4f46e5); }
-.m-val.urgent { color: #dc2626; }
-.m-val.muted { color: #94a3b8; }
+.m-val.primary { color: var(--primary-color, #2f5d6b); }
+.m-val.urgent { color: var(--color-expense, #DC2626); }
+.m-val.muted { color: var(--text-muted, #94A3B8); }
 .m-lbl {
   font-size: 11px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
 }
 .m-divider {
   width: 1px;
   height: 16px;
-  background: #e2e8f0;
+  background: var(--line-hairline, #E2E8F0);
   flex-shrink: 0;
 }
 
@@ -793,7 +791,7 @@ function handleDrawerAddLedger(task) {
 }
 .field-shell {
   background: #fff;
-  border-radius: 16px;
+  border-radius: var(--radius-lg, 16px);
   border: 1px solid #f1f5f9;
   box-sizing: border-box;
 }
@@ -806,17 +804,17 @@ function handleDrawerAddLedger(task) {
   gap: 6px;
 }
 .search-icon { font-size: 13px; opacity: 0.35; }
-.search-input { flex: 1; font-size: 13px; color: #334155; font-weight: 600; }
-.clear-search { font-size: 12px; color: #cbd5e1; padding: 4px; }
+.search-input { flex: 1; font-size: 13px; color: var(--text-ink, #334155); font-weight: 600; }
+.clear-search { font-size: 12px; color: var(--text-faint, #CBD5E1); padding: 4px; }
 .filter-btn {
   height: 40px;
   padding: 0 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg, 16px);
   border: 1px solid #f1f5f9;
   background: #fff;
   font-size: 12px;
-  font-weight: 800;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
   display: flex;
   align-items: center;
 }
@@ -833,24 +831,24 @@ function handleDrawerAddLedger(task) {
   justify-content: center;
   height: 30px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill, 999px);
   background: #fff;
   border: 1px solid #f1f5f9;
   box-sizing: border-box;
 }
 .tab-chip text {
   font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
   line-height: 1;
   display: block;
 }
 .tab-chip.active {
-  background: var(--primary-soft, #eef2ff);
-  border-color: var(--primary-color, #4f46e5);
+  background: var(--primary-soft, #e9f0f2);
+  border-color: var(--primary-color, #2f5d6b);
 }
 .tab-chip.active text {
-  color: var(--primary-color, #4f46e5);
+  color: var(--primary-color, #2f5d6b);
 }
 
 .board-scroll { flex: 1; height: 0; }
@@ -859,19 +857,19 @@ function handleDrawerAddLedger(task) {
 .group-title {
   display: block;
   font-size: 11px;
-  font-weight: 800;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   margin: 4px 0 6px 4px;
   letter-spacing: 0.5px;
 }
-.group-title.red { color: #dc2626; }
-.group-title.green { color: #94a3b8; font-weight: 700; }
+.group-title.red { color: var(--color-expense, #DC2626); }
+.group-title.green { color: var(--text-muted, #94A3B8); font-weight: 600; }
 .task-group { margin-bottom: 10px; }
 .group-completed { margin-top: 2px; }
 
 .task-panel {
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: var(--radius-lg, 16px);
   overflow: hidden;
   border: 1px solid #f1f5f9;
 }
@@ -885,24 +883,24 @@ function handleDrawerAddLedger(task) {
   padding: 36px 16px;
   text-align: center;
   background: #fff;
-  border-radius: 18px;
-  border: 1px dashed #e2e8f0;
+  border-radius: var(--radius-lg, 16px);
+  border: 1px dashed var(--line-hairline, #E2E8F0);
 }
 .empty-t {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted, #94A3B8);
   margin-bottom: 12px;
 }
 .empty-btn {
   display: inline-flex;
   padding: 10px 18px;
-  border-radius: 999px;
-  background: var(--primary-soft, #eef2ff);
-  color: var(--primary-color, #4f46e5);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--primary-soft, #e9f0f2);
+  color: var(--primary-color, #2f5d6b);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .bottom-safe-spacer { height: 24px; }
@@ -914,11 +912,11 @@ function handleDrawerAddLedger(task) {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12px 28px var(--primary-glow, rgba(79, 70, 229, 0.28));
+  box-shadow: 0 12px 28px var(--primary-glow, rgba(47, 93, 107, 0.28));
   z-index: 100;
 }
 .fab-icon {
@@ -932,7 +930,6 @@ function handleDrawerAddLedger(task) {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(12px);
   z-index: 1000;
   display: flex;
   align-items: flex-end;
@@ -941,28 +938,28 @@ function handleDrawerAddLedger(task) {
 .action-sheet {
   width: 100%;
   background: #fff;
-  border-radius: 28px 28px 0 0;
+  border-radius: var(--radius-lg, 16px) 28px 0 0;
   padding: 8px 20px 24px;
 }
 .sheet-handle {
   width: 42px;
   height: 5px;
-  border-radius: 10px;
-  background: #e2e8f0;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--line-hairline, #E2E8F0);
   margin: 0 auto 16px;
 }
 .sheet-title {
   display: block;
   font-size: 18px;
-  font-weight: 900;
-  color: #1e293b;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
   margin-bottom: 16px;
 }
 .sheet-task-title {
   display: block;
   font-size: 15px;
-  font-weight: 800;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
   margin-bottom: 12px;
   text-align: center;
 }
@@ -970,8 +967,8 @@ function handleDrawerAddLedger(task) {
 .filter-label {
   display: block;
   font-size: 11px;
-  font-weight: 800;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   margin-bottom: 8px;
   text-transform: uppercase;
 }
@@ -982,23 +979,23 @@ function handleDrawerAddLedger(task) {
   justify-content: center;
   height: 28px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill, 999px);
   background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line-hairline, #E2E8F0);
   box-sizing: border-box;
 }
 .f-chip text {
   font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
   line-height: 1;
   display: block;
 }
 .f-chip.on {
-  background: var(--primary-soft, #eef2ff);
-  border-color: var(--primary-color, #4f46e5);
+  background: var(--primary-soft, #e9f0f2);
+  border-color: var(--primary-color, #2f5d6b);
 }
-.f-chip.on text { color: var(--primary-color, #4f46e5); }
+.f-chip.on text { color: var(--primary-color, #2f5d6b); }
 .filter-actions {
   display: flex;
   gap: 10px;
@@ -1008,16 +1005,16 @@ function handleDrawerAddLedger(task) {
 .filter-apply {
   flex: 1;
   height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-md, 12px);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
 }
-.filter-reset { background: #f1f5f9; color: #64748b; }
+.filter-reset { background: #f1f5f9; color: var(--text-sub, #64748B); }
 .filter-apply {
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   color: #fff;
 }
 
@@ -1025,18 +1022,18 @@ function handleDrawerAddLedger(task) {
   padding: 16px 0;
   text-align: center;
   font-size: 15px;
-  font-weight: 700;
-  color: #334155;
+  font-weight: 600;
+  color: var(--text-ink, #334155);
   border-bottom: 1px solid #f1f5f9;
 }
-.action-item.danger { color: #f43f5e; }
+.action-item.danger { color: var(--color-expense, #F43F5E); }
 .action-cancel {
   margin-top: 8px;
   padding: 14px 0;
   text-align: center;
   font-size: 14px;
-  font-weight: 700;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
 }
 
 .ledger-prompt-wrap {
@@ -1051,7 +1048,7 @@ function handleDrawerAddLedger(task) {
 .ledger-prompt-card {
   width: 100%;
   background: #fff;
-  border-radius: 20px;
+  border-radius: var(--radius-lg, 16px);
   padding: 16px;
   display: flex;
   align-items: center;
@@ -1059,14 +1056,14 @@ function handleDrawerAddLedger(task) {
 }
 .lp-icon { font-size: 28px; }
 .lp-content { flex: 1; min-width: 0; }
-.lp-h { display: block; font-size: 14px; font-weight: 900; color: #1e293b; }
-.lp-p { display: block; font-size: 12px; color: #64748b; margin-top: 2px; }
+.lp-h { display: block; font-size: 14px; font-weight: 600; color: var(--text-ink, #1E293B); }
+.lp-p { display: block; font-size: 12px; color: var(--text-sub, #64748B); margin-top: 2px; }
 .lp-btn {
   padding: 8px 14px;
-  border-radius: 12px;
-  background: var(--primary-color, #4f46e5);
+  border-radius: var(--radius-md, 12px);
+  background: var(--primary-color, #2f5d6b);
   color: #fff;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <view class="compose-bar field-shell" :class="{ 'field-shell-focus': isInputFocus }">
+  <view class="compose-bar field-shell" :class="[themeClass, { 'field-shell-focus': isInputFocus }]">
     <view class="compose-main">
       <input
         :value="modelValue"
@@ -38,6 +38,10 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useAppTheme } from '@/common/themes/useAppTheme.js'
+
+// 根节点带主题类，组件内部的 var(--primary-color) 才会跟着换肤走
+const { themeClass } = useAppTheme()
 
 defineProps({
   modelValue: { type: String, default: '' },
@@ -63,6 +67,7 @@ const isInputFocus = ref(false)
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
 .field-shell {
   background: #fff;
   border-radius: 16px;
@@ -71,8 +76,8 @@ const isInputFocus = ref(false)
   box-sizing: border-box;
 }
 .field-shell-focus {
-  border-color: var(--primary-color, #4f46e5);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+  border-color: var(--primary-color, #2f5d6b);
+  box-shadow: 0 0 0 3px rgba(47, 93, 107, 0.08);
 }
 .compose-bar {
   padding: 10px 12px 8px;
@@ -88,7 +93,7 @@ const isInputFocus = ref(false)
   flex: 1;
   font-size: 15px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-ink, #1E293B);
   height: 36px;
 }
 .compose-add {
@@ -101,14 +106,14 @@ const isInputFocus = ref(false)
   justify-content: center;
   flex-shrink: 0;
 }
-.compose-add.on { background: var(--primary-color, #4f46e5); }
-.add-icon { font-size: 20px; font-weight: 300; color: #94a3b8; line-height: 1; }
+.compose-add.on { background: var(--primary-color, #2f5d6b); }
+.add-icon { font-size: 20px; font-weight: 300; color: var(--text-muted, #94A3B8); line-height: 1; }
 .compose-add.on .add-icon { color: #fff; }
 .mini-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(79, 70, 229, 0.2);
-  border-top-color: var(--primary-color, #4f46e5);
+  border: 2px solid rgba(47, 93, 107, 0.2);
+  border-top-color: var(--primary-color, #2f5d6b);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -123,20 +128,20 @@ const isInputFocus = ref(false)
   padding: 0 12px;
   border-radius: 999px;
   background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line-hairline, #E2E8F0);
   flex-shrink: 0;
   box-sizing: border-box;
 }
 .chip-label {
   font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
   line-height: 1;
   display: block;
 }
-.chip.on { background: var(--primary-soft, #eef2ff); border-color: var(--primary-color, #4f46e5); }
-.chip.on .chip-label { color: var(--primary-color, #4f46e5); }
-.chip-urgent.on { background: #fff1f2; border-color: #fecdd3; }
-.chip-urgent.on .chip-label { color: #f43f5e; }
+.chip.on { background: var(--primary-soft, #e9f0f2); border-color: var(--primary-color, #2f5d6b); }
+.chip.on .chip-label { color: var(--primary-color, #2f5d6b); }
+.chip-urgent.on { background: var(--color-expense-soft, #FFF1F2); border-color: var(--color-expense-soft, #FECDD3); }
+.chip-urgent.on .chip-label { color: var(--color-expense, #F43F5E); }
 .chip-ghost { background: transparent; border-style: dashed; }
 </style>

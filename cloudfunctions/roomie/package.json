@@ -1,0 +1,12 @@
+{
+  "name": "roomie",
+  "version": "2.1.7",
+  "description": "Roomie 家庭协同小程序云函数（单函数多 action 分发）",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3",
+    "xlsx": "^0.18.5",
+    "iconv-lite": "^0.6.3"
+  }
+}

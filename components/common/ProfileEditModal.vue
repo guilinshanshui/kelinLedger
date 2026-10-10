@@ -7,11 +7,8 @@
     @touchmove.stop.prevent
   >
     <view 
-      class="modal-panel animate-slide-up" 
-      :style="{ 
-        transform: `translateY(${panelY}px)`, 
-        transition: isSwiping ? 'none' : 'transform 0.4s cubic-bezier(0.19, 1, 0.22, 1)' 
-      }"
+      class="modal-panel" 
+      :style="panelStyle"
       @click.stop
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
@@ -31,11 +28,11 @@
 		<view class="avatar-upload-section">
 			<button class="avatar-button" open-type="chooseAvatar" @chooseavatar="chooseAvatarEvent">
           <view class="avatar-wrapper">
-            <image :src="userInfo.avatar || 'https://i.pravatar.cc/150?u=default'" class="preview-avatar" />
-            <view class="camera-badge">📸</view>
+            <UserAvatar :src="userInfo.avatar" :name="userInfo.nickname" :size="100" radius="35px" class="preview-avatar" />
+            <view class="camera-badge"><AppIcon name="camera" :size="16" color="#FFFFFF" /></view>
           </view>
 		  </button>
-          <text class="upload-tip">点击修改头像</text>
+          <text class="upload-tip">点击选择头像，可直接用微信头像</text>
         </view>
 
         <!-- 昵称输入 -->
@@ -47,17 +44,19 @@
               type="nickname"
               class="nickname-input" 
               placeholder="请输入您的昵称" 
-              placeholder-style="color: #CBD5E1"
+              placeholder-style="color: var(--text-faint, #66788D)"
               maxlength="10"
             />
-            <view v-if="userInfo.nickname" class="clear-btn" @click="userInfo.nickname = ''">✕</view>
+            <view v-if="userInfo.nickname" class="clear-btn" @click="userInfo.nickname = ''">
+              <AppIcon name="close" :size="14" />
+            </view>
           </view>
         </view>
       </view>
 
       <view class="modal-footer">
         <button class="save-btn" @click="handleSave">
-          <text class="btn-txt">{{ isEdit ? '保存修改' : '进入 FamilyLink' }}</text>
+          <text class="btn-txt">{{ isEdit ? '保存修改' : '开始使用' }}</text>
         </button>
       </view>
       
@@ -68,11 +67,15 @@
 
 <script setup>
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
-const { themeClass, primaryColor, softColor, theme } = useAppTheme()
+const { themeClass } = useAppTheme()
 
-import { ref, watch, reactive, onMounted } from 'vue';
-import {base64,getFileExtension} from '../../pages/js/utils.js';
-import { userApi } from '@/common/api';
+import { ref, watch, reactive, computed } from 'vue';
+import { uploadApi, userApi } from '@/common/api';
+import UserAvatar from './UserAvatar.vue';
+import AppIcon from './AppIcon.vue';
+import { getStoredUser } from '@/common/utils/session';
+import { playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
+import { useUserStore } from '@/store/user';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -94,11 +97,18 @@ const isSwiping = ref(false);
 const panelY = ref(0);
 let startY = 0;
 
-// 当弹窗打开时，从props或本地存储初始化用户信息
+const panelTransform = ref({ transform: 'translateY(100%)', transition: 'none' });
+const panelStyle = computed(() => panelTransform.value);
+
+// 当弹窗打开时，从 props 或本地存储初始化用户信息。
+// immediate 不能省：登录页用 v-if="pendingUserInfo" 挂载本组件，
+// 挂载瞬间 modelValue 已经是 true，普通 watch 不会触发，
+// 弹窗就会停在屏幕下方（界面上只剩一层遮罩，看不到内容）。
 watch(() => props.modelValue, (val) => {
   if (val) {
     panelY.value = 0;
     isClosing.value = false;
+    playSheetOpen(panelTransform);
 
     // 优先使用传入的props.userInfo
     if (props.userInfo && typeof props.userInfo === 'object') {
@@ -107,7 +117,7 @@ watch(() => props.modelValue, (val) => {
     } else {
       // 尝试从本地存储读取
       try {
-        const stored = uni.getStorageSync('userInfo') || {};
+        const stored = getStoredUser() || {};
         userInfo.avatar = stored.avatar || props.initialAvatar || '';
         userInfo.nickname = stored.nickname || props.initialNickname || '';
       } catch (e) {
@@ -116,10 +126,9 @@ watch(() => props.modelValue, (val) => {
       }
     }
   }
-});
+}, { immediate: true });
 const bindblur=(e)=>{
 		userInfo.nickname=e.detail.value;
-		console.log(e);
 	}
 
 // 头像选择
@@ -130,74 +139,61 @@ const bindblur=(e)=>{
 	}
 
 
-const handleSave = async()=>  {
-	console.log(userInfo.nickname+"|"+userInfo.avatar);
-  if (!userInfo.nickname.trim()) {
-    uni.showToast({ title: '请输入昵称', icon: 'none' });
-    return;
-  }
-  if (!userInfo.avatar.trim()) {
-    uni.showToast({ title: '请选择头像', icon: 'none' });
-    return;
-  }
-  uni.showLoading({ title: '处理中...' });
- try{
- 	var origin=getFileExtension(userInfo.avatar);
- 	var base=await base64(userInfo.avatar, origin);
- 	console.log(origin);
-	//,
- 	// 确保使用有效的用户信息来源（优先props，其次本地存储）
- 	let sourceUser = props.userInfo && typeof props.userInfo === 'object' ? props.userInfo : {};
- 	if (!sourceUser || Object.keys(sourceUser).length === 0) {
- 	  try {
- 	    sourceUser = uni.getStorageSync('userInfo') || {};
- 	  } catch (e) {
- 	    sourceUser = {};
- 	  }
- 	}
- 	console.log('sourceUser:', sourceUser);
- 	var data={"randomAccount":1,userId: sourceUser.userId || sourceUser.id || '', userNickname:userInfo.nickname, openid: sourceUser.openid || '', origin:origin, base64:base};
- 	if(props.infoType==1&&uni.getStorageSync("code")!=null&&uni.getStorageSync("code")!=undefined){//如果是登录完善信息传递邀请的code
- 		data["invited"]=uni.getStorageSync("code");
- 		
- 	}
- 		var res=await userApi.updateUserAratar(data,"提交中...");
-		if(res.code==0){
-			// 关闭弹窗
-			handleCancel();
+/**
+ * 判断头像地址是否已经落在云存储上。
+ *
+ * 微信头像选择器（open-type="chooseAvatar"）交回来的是本机临时路径：
+ * 真机是 wxfile://tmp_xxx，开发者工具是 http://tmp/xxx.jpeg。
+ * 这种路径只在当前设备当前会话有效，直接存库会让头像在真机上变空白，
+ * 因此只有 cloud:// 和云存储自有域名才算“已上传”。
+ */
+const CLOUD_FILE_RE = /^cloud:\/\//
+const CLOUD_HTTP_RE = /^https:\/\/[^/]*\.(tcb\.qcloud\.la|tcloudbase\.com|myqcloud\.com)\//
+const isUploadedAvatar = (url) => CLOUD_FILE_RE.test(url) || CLOUD_HTTP_RE.test(url)
 
-			// 更新来源用户信息并持久化
-			const updatedUser = {
-			  ...(sourceUser || {}),
-			  userNickname: userInfo.nickname,
-			  avatar: res.data.userHeadUrl,
-			  email:res.data.email,
-			  password:res.data.password,
-			  token:res.data.token
-			};
-			uni.setStorageSync("userInfo", updatedUser);
-			emit('complete', updatedUser);
- 		}else{
- 			uni.showToast({
- 				title: res.msg,
- 				icon: 'none',
- 				mask: true,
- 			})
- 		}
- 	
- }catch(error){
-	 uni.hideLoading();
- 	console.log(error)
- }
+const handleSave = async () => {
+  const nickname = String(userInfo.nickname || '').trim()
+  if (!nickname) {
+    uni.showToast({ title: '请输入昵称', icon: 'none' })
+    return
+  }
+  if (!userInfo.avatar) {
+    uni.showToast({ title: '请选择头像', icon: 'none' })
+    return
+  }
+
+  uni.showLoading({ title: '保存中…', mask: true })
+  try {
+    let avatar = userInfo.avatar
+    // 临时路径（wxfile:// 或 http://tmp/…）先传云存储，已上传的直接复用。
+    if (!isUploadedAvatar(avatar)) {
+      const uploaded = await uploadApi.uploadImage(avatar, 'avatar')
+      if (uploaded.code !== 0) throw new Error(uploaded.message || '头像上传失败')
+      avatar = uploaded.data.url || uploaded.data.fileID
+    }
+
+    const result = await userApi.updateUserInfo({ nickname, avatar })
+    if (result.code !== 0) throw new Error(result.message || '保存失败')
+    const userStore = useUserStore()
+    userStore.setUser({ ...(getStoredUser() || {}), ...result.data })
+    handleCancel()
+    emit('complete', result.data)
+  } catch (error) {
+    uni.showToast({ title: error.message || '保存失败', icon: 'none' })
+  } finally {
+    uni.hideLoading()
+  }
 };
 
+
 const handleCancel = () => {
+  if (isClosing.value) return;
   isClosing.value = true;
-  panelY.value = 800;
+  const ms = playSheetClose(panelTransform);
   setTimeout(() => {
     emit('update:modelValue', false);
     isClosing.value = false;
-  }, 300);
+  }, ms);
 };
 
 /* --- 手势逻辑 --- */
@@ -205,19 +201,25 @@ const onTouchStart = (e) => { startY = e.touches[0].clientY; isSwiping.value = t
 const onTouchMove = (e) => {
   const diff = e.touches[0].clientY - startY;
   if (diff > 0) panelY.value = diff;
+  if (diff > 0) panelTransform.value = { transform: 'translateY(' + diff + 'px)', transition: 'none' };
 };
 const onTouchEnd = () => {
   isSwiping.value = false;
   if (panelY.value > 150) handleCancel();
-  else panelY.value = 0;
+  else {
+    panelY.value = 0;
+    panelTransform.value = { transform: 'translateY(0)', transition: sheetPanelTransition() };
+  }
 };
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .modal-mask {
   position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(20px); z-index: 9999; display: flex; align-items: flex-end;
-  transition: opacity 0.3s;
+   z-index: 9999; display: flex; align-items: flex-end;
+  transition: opacity 0.25s ease-out;
 }
 .mask-closing { opacity: 0; }
 
@@ -229,8 +231,8 @@ const onTouchEnd = () => {
 .modal-handle { width: 42px; height: 5px; background: #F1F5F9; border-radius: 10px; margin: 0 auto 32px; }
 
 .modal-header { margin-bottom: 32px; }
-.sub-label { font-size: 11px; font-weight: 900; color: #94A3B8; text-transform: uppercase; letter-spacing: 2px; }
-.main-title { font-size: 24px; font-weight: 900; color: #1E293B; margin-top: 4px; display: block; }
+.sub-label { font-size: 11px; font-weight: 600; color: var(--text-muted, #94A3B8); text-transform: uppercase; letter-spacing: 2px; }
+.main-title { font-size: 24px; font-weight: 600; color: var(--text-ink, #1E293B); margin-top: 4px; display: block; }
 
 .modal-body { display: flex; flex-direction: column; align-items: center; }
 
@@ -274,27 +276,25 @@ const onTouchEnd = () => {
   background: #fff; border-radius: 50%; display: flex; align-items: center; 
   justify-content: center; font-size: 14px; box-shadow: none !important; border: none !important;
 }
-.upload-tip { font-size: 12px; font-weight: 800; color: #CBD5E1; }
+.upload-tip { font-size: 12px; font-weight: 600; color: var(--text-faint, #CBD5E1); }
 
 .input-section { width: 100%; margin-bottom: 32px; }
-.input-label { font-size: 11px; font-weight: 900; color: #94A3B8; text-transform: uppercase; margin-bottom: 12px; display: block; }
+.input-label { font-size: 11px; font-weight: 600; color: var(--text-muted, #94A3B8); text-transform: uppercase; margin-bottom: 12px; display: block; }
 .nickname-input-box { 
   background: #F8FAFC; height: 64px; border-radius: 20px; border: 1px solid #F1F5F9; 
   padding: 0 20px; display: flex; align-items: center; gap: 12px;
 }
-.nickname-input { flex: 1; font-size: 17px; font-weight: 800; color: #1E293B; }
-.clear-btn { width: 20px; height: 20px; background: #E2E8F0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
+.nickname-input { flex: 1; font-size: 17px; font-weight: 600; color: var(--text-ink, #1E293B); }
+.clear-btn { width: 20px; height: 20px; background: var(--line-hairline, #E2E8F0); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
 
 .save-btn { 
-  width: 100%; height: 64px; background: var(--primary-color, #4F46E5); border-radius: 22px; 
+  width: 100%; height: 64px; background: var(--primary-color, #2F5D6B); border-radius: 22px; 
   display: flex; align-items: center; justify-content: center; border: none;
-  box-shadow: 0 10px 25px var(--primary-glow, rgba(79, 70, 229, 0.2));
+  box-shadow: 0 10px 25px var(--primary-glow, rgba(47, 93, 107, 0.2));
 }
 .save-btn:active { transform: scale(0.96); opacity: 0.9; }
-.btn-txt { color: #fff; font-size: 16px; font-weight: 900; }
+.btn-txt { color: #fff; font-size: 16px; font-weight: 600; }
 
 .safe-area-bottom { height: env(safe-area-inset-bottom); margin-top: 10px; }
 
-.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.19, 1, 0.22, 1); }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>

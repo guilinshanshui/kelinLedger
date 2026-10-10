@@ -30,7 +30,7 @@
           <view class="header-right">
             <slot name="header-right">
               <view class="close-icon-btn" @click="handleClose" v-if="showClose">
-                <text class="close-txt">✕</text>
+                <AppIcon name="close" :size="16" />
               </view>
             </slot>
           </view>
@@ -58,9 +58,11 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import AppIcon from './AppIcon.vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
 
 const { themeClass, primaryColor } = useAppTheme();
+import { playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -86,15 +88,18 @@ const maskLayerStyle = computed(() => ({
   backgroundColor: `rgba(15, 23, 42, ${maskOpacity.value})`
 }));
 
+const panelTransform = ref({ transform: 'translateY(100%)', transition: 'none' });
+
 const panelStyle = computed(() => ({
-  transform: `translateY(${modalTranslateY.value}px)`,
-  transition: isSwiping.value ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'
+  ...panelTransform.value,
+  transform: `translateY(${modalTranslateY.value}px)`
 }));
 
 watch(() => props.modelValue, (newVal) => {
   if (newVal) {
     modalTranslateY.value = 0;
     isClosing.value = false;
+    playSheetOpen(panelTransform);
   }
 });
 
@@ -105,30 +110,38 @@ const onTouchStart = (e) => {
 
 const onTouchMove = (e) => {
   const diff = e.touches[0].clientY - startY;
-  if (diff > 0) modalTranslateY.value = Math.pow(diff, 0.98);
+  if (diff > 0) {
+    modalTranslateY.value = Math.pow(diff, 0.98);
+    panelTransform.value = { transform: 'translateY(' + Math.pow(diff, 0.98) + 'px)', transition: 'none' };
+  }
 };
 
 const onTouchEnd = () => {
   isSwiping.value = false;
   if (modalTranslateY.value > 150) handleClose();
-  else modalTranslateY.value = 0;
+  else {
+    modalTranslateY.value = 0;
+    panelTransform.value = { transform: 'translateY(0)', transition: sheetPanelTransition() };
+  }
 };
 
 const handleClose = () => {
+  if (isClosing.value) return;
   isClosing.value = true;
-  modalTranslateY.value = 800; 
+  const ms = playSheetClose(panelTransform);
   setTimeout(() => {
     emit('update:modelValue', false);
     emit('close');
     isClosing.value = false;
-  }, 300);
+  }, ms);
 };
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .drawer-mask {
   position: fixed; inset: 0; 
-  backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
   z-index: 9999; display: flex; align-items: flex-end; transition: opacity 0.3s;
 }
 .mask-fade-out { opacity: 0; }
@@ -171,11 +184,11 @@ const handleClose = () => {
   padding: 0 32rpx;
   flex-shrink: 0;
 }
-.header-title { font-size: 36rpx; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; }
+.header-title { font-size: 36rpx; font-weight: 600; color: var(--text-ink, #0F172A); letter-spacing: 0; }
 .header-subtitle {
   font-size: 22rpx;
-  font-weight: 700;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   text-transform: uppercase;
   letter-spacing: 1.5px;
   display: block;
@@ -189,11 +202,10 @@ const handleClose = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line-hairline, #E2E8F0);
   transition: background 0.2s ease, transform 0.2s ease;
 }
-.close-icon-btn:active { background: #e2e8f0; transform: scale(0.94); }
-.close-txt { color: #94a3b8; font-size: 24rpx; font-weight: 700; }
+.close-icon-btn:active { background: var(--line-hairline, #E2E8F0); transform: scale(0.94); }
 
 .drawer-scroll-area {
   flex: 1;

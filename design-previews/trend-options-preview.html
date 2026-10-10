@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>收支趋势 · 三种画法对照</title>
+<style>
+  :root {
+    --primary: #2F5D6B;
+    --primary-soft: #E9F0F2;
+    --text-ink: #1E293B;
+    --text-sub: #4E5F74;
+    --text-muted: #5D6E84;
+    --text-faint: #66788D;
+    --line-hairline: #E8EEEF;
+    --line-soft: #F1F5F5;
+    --expense: #B84A42;
+    --income: #317F62;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 28px 24px 36px;
+    background: #EEF2F4;
+    color: var(--text-ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .sub {
+    margin: 0 0 22px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .col { width: 340px; }
+
+  .col-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .tag {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--primary);
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+
+  .tag.alt { background: #8A6B53; }
+
+  .col-title { font-size: 14px; font-weight: 600; }
+
+  .col-note {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--text-muted);
+  }
+
+  /* ---- 图表卡片：完全对齐小程序的样式 ---- */
+  .card {
+    background: #fff;
+    border: 1px solid var(--line-hairline);
+    border-radius: 16px;
+    padding: 16px 16px 12px;
+  }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .card-title { font-size: 15px; font-weight: 600; }
+
+  .legend { display: flex; gap: 12px; }
+
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  .legend-dot.exp { background: var(--expense); }
+  .legend-dot.inc { background: var(--income); }
+
+  .legend-txt { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+
+  .plot {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    height: 120px;
+    gap: 2px;
+  }
+
+  .gridline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--line-soft);
+  }
+
+  .col-cell {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .pair {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1px;
+    width: 100%;
+    height: 100%;
+  }
+
+  .bar {
+    flex: 1 1 0;
+    min-width: 1px;
+    max-width: 12px;
+    min-height: 2px;
+    border-radius: 3px 3px 0 0;
+  }
+
+  .bar.exp { background: var(--expense); }
+  .bar.inc { background: var(--income); }
+
+  /* 方案 B 的底槽 */
+  .track {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 12px;
+    height: 100%;
+    border-radius: 3px;
+    background: #F4F7F8;
+  }
+
+  .axis {
+    height: 1px;
+    background: var(--line-hairline);
+  }
+
+  .ticks {
+    display: flex;
+    gap: 2px;
+    margin-top: 6px;
+  }
+
+  .tick-cell { flex: 1; min-width: 0; text-align: center; }
+  .tick-cell.first { text-align: left; }
+  .tick-cell.last { text-align: right; }
+  .tick {
+    font-size: 9px;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .foot {
+    margin-top: 10px;
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  tr.sum td { font-size: 12px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <h1>收支趋势 · 三种画法对照</h1>
+  <p class="sub">
+    同一份数据（2026 年 10 月 · 共 5 笔 · 支出 90.00 元），只换图表的画法。配色与卡片样式和当前项目一致。
+  </p>
+
+  <div class="row" id="row"></div>
+
+<script>
+  /* ---------- 数据：来自账本 123 的 2026-10 真实记录 ---------- */
+  const EXPENSE_BY_DAY = { 5: 38, 6: 52 }
+  const INCOME_BY_DAY = {}
+  const DAYS_IN_MONTH = 31
+  const MAX = 52
+
+  const days = Array.from({ length: DAYS_IN_MONTH }, (_, i) => {
+    const d = i + 1
+    return {
+      day: d,
+      expense: EXPENSE_BY_DAY[d] || 0,
+      income: INCOME_BY_DAY[d] || 0
+    }
+  })
+
+  /* 方案 A：按月内自然周聚合（周一为一周起点） */
+  const weeks = (() => {
+    const out = []
+    let cursor = 1
+    while (cursor <= DAYS_IN_MONTH) {
+      const start = cursor
+      const weekday = new Date(2026, 9, start).getDay() || 7 // 1=周一 ... 7=周日
+      const end = Math.min(DAYS_IN_MONTH, start + (7 - weekday))
+      const slice = days.filter((d) => d.day >= start && d.day <= end)
+      out.push({
+        label: `${start}-${end}日`,
+        expense: slice.reduce((s, d) => s + d.expense, 0),
+        income: slice.reduce((s, d) => s + d.income, 0)
+      })
+      cursor = end + 1
+    }
+    return out
+  })()
+
+  const heightPct = (v, max) => (v > 0 ? Math.max(2, (v / max) * 100) : 0)
+
+  /* ---------- 渲染器 ---------- */
+  function renderChart({ buckets, ticks, max, mode }) {
+    // 列少的时候把柱宽放开，否则 5 根大格子里的柱子看着像牙签
+    const barMax = buckets.length <= 7 ? 28 : buckets.length <= 18 ? 14 : 12
+    const plot = document.createElement('div')
+    plot.className = 'plot'
+    plot.innerHTML = '<div class="gridline" style="top:50%"></div>'
+
+    buckets.forEach((b) => {
+      const cell = document.createElement('div')
+      cell.className = 'col-cell'
+
+      if (mode === 'track') {
+        const track = document.createElement('div')
+        track.className = 'track'
+        cell.appendChild(track)
+      }
+
+      const pair = document.createElement('div')
+      pair.className = 'pair'
+
+      if (b.expense > 0) {
+        const bar = document.createElement('div')
+        bar.className = 'bar exp'
+        bar.style.height = heightPct(b.expense, max) + '%'
+        bar.style.maxWidth = barMax + 'px'
+        pair.appendChild(bar)
+      }
+      if (b.income > 0) {
+        const bar = document.createElement('div')
+        bar.className = 'bar inc'
+        bar.style.height = heightPct(b.income, max) + '%'
+        bar.style.maxWidth = barMax + 'px'
+        pair.appendChild(bar)
+      }
+
+      cell.appendChild(pair)
+      plot.appendChild(cell)
+    })
+
+    const axis = document.createElement('div')
+    axis.className = 'axis'
+
+    const tickRow = document.createElement('div')
+    tickRow.className = 'ticks'
+    ticks.forEach((t, i) => {
+      const cell = document.createElement('div')
+      cell.className = 'tick-cell'
+      if (i === 0) cell.classList.add('first')
+      if (i === ticks.length - 1) cell.classList.add('last')
+      if (t) cell.innerHTML = `<span class="tick">${t}</span>`
+      tickRow.appendChild(cell)
+    })
+
+    const foot = document.createElement('div')
+    foot.className = 'foot'
+    foot.textContent = '纵轴单位：元；空白表示该时段无账单'
+
+    const frag = document.createDocumentFragment()
+    frag.append(plot, axis, tickRow, foot)
+    return frag
+  }
+
+  function card(title, frag) {
+    const el = document.createElement('div')
+    el.className = 'card'
+    el.innerHTML = `
+      <div class="card-head">
+        <span class="card-title">${title}</span>
+        <span class="legend">
+          <span class="legend-item"><i class="legend-dot exp"></i><span class="legend-txt">支出</span></span>
+          <span class="legend-item"><i class="legend-dot inc"></i><span class="legend-txt">收入</span></span>
+        </span>
+      </div>`
+    el.appendChild(frag)
+    return el
+  }
+
+  function column({ tag, alt, title, note, buckets, ticks, max, mode, order }) {
+    const wrap = document.createElement('div')
+    wrap.className = 'col'
+    if (order) wrap.style.order = order
+    wrap.innerHTML = `
+      <div class="col-head">
+        <span class="tag${alt ? ' alt' : ''}">${tag}</span>
+        <span class="col-title">${title}</span>
+      </div>`
+    wrap.appendChild(card('收支趋势', renderChart({ buckets, ticks, max, mode })))
+    const p = document.createElement('p')
+    p.className = 'col-note'
+    p.innerHTML = note
+    wrap.appendChild(p)
+    return wrap
+  }
+
+  /* ---------- 三栏 ---------- */
+  const row = document.getElementById('row')
+
+  // 方案 C：折叠连续无账单的日期，只留有数据的区间
+  const compact = [
+    { day: 4, expense: 0, income: 0 },
+    { day: 5, expense: 38, income: 0 },
+    { day: 6, expense: 52, income: 0 }
+  ]
+
+  row.appendChild(
+    column({
+      tag: '方案 C',
+      alt: true,
+      order: 4,
+      title: '折叠空档（只留有数据的日子）',
+      buckets: compact,
+      ticks: compact.map((d) => `${d.day}日`),
+      max: MAX,
+      mode: 'plain',
+      note:
+        '月初月末大段没账单就收起来，只画 10/04–10/06 这一段（就是现在“全部”标签页的样子）。' +
+        '柱子宽敞、日期精确；<b>代价是横轴不再是完整月份</b>，要额外给一个“已折叠 N 天”的提示。'
+    })
+  )
+
+  // 现状：每天一根柱
+  row.appendChild(
+    column({
+      tag: '现状',
+      order: 1,
+      title: '每天一根柱',
+      buckets: days.map((d) => ({ expense: d.expense, income: d.income })),
+      ticks: days.map((d) =>
+        d.day === 1 || d.day % 5 === 0 || d.day === DAYS_IN_MONTH ? `${d.day}日` : ''
+      ),
+      max: MAX,
+      mode: 'plain',
+      note:
+        '31 列 → 每列约 9px，柱子只有 4px 上下；' +
+        '月初月末两天有账单，柱子看起来很细，两条线挤在一起。'
+    })
+  )
+
+  // 方案 A：按月内周聚合
+  row.appendChild(
+    column({
+      tag: '方案 A',
+      alt: true,
+      order: 2,
+      title: '按月内周聚合',
+      buckets: weeks,
+      ticks: weeks.map((w) => w.label),
+      max: Math.max(...weeks.map((w) => w.expense)),
+      mode: 'plain',
+      note:
+        '5 列 → 每列约 60px，柱子能撑开，读数更轻松；' +
+        '<b>代价是丢掉“具体哪天”</b>：10/05 和 10/06 的两笔会被合并成“10月5-11日 90.00”一根柱。'
+    })
+  )
+
+  // 方案 B：每天一条底槽
+  row.appendChild(
+    column({
+      tag: '方案 B',
+      order: 3,
+      title: '每天加一条底槽',
+      buckets: days.map((d) => ({ expense: d.expense, income: d.income })),
+      ticks: days.map((d) =>
+        d.day === 1 || d.day % 5 === 0 || d.day === DAYS_IN_MONTH ? `${d.day}日` : ''
+      ),
+      max: MAX,
+      mode: 'track',
+      note:
+        '刻度仍然是每天一格，但每格先铺一条浅色竖槽，柱子填在槽里，' +
+        '整张图看起来更“成体系”。' +
+        '缺点：一个月 31 条竖槽本身就是一层细密的视觉噪点，空数据的日子反而更抢眼。'
+    })
+  )
+</script>
+</body>
+</html>

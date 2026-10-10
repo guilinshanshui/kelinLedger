@@ -24,7 +24,7 @@
             :class="{ active: billSource === item.code }"
             @click="billSource = item.code"
           >
-            <text class="source-icon">{{ item.icon }}</text>
+            <image class="source-icon" :src="item.iconPath" mode="aspectFit" />
             <text class="source-name">{{ item.name }}</text>
             <text class="source-hint">{{ item.hint }}</text>
           </view>
@@ -37,7 +37,7 @@
 
         <view class="upload-zone" @click="pickBillFile">
           <view class="upload-icon-wrap">
-            <text class="upload-icon">📄</text>
+          <AppIcon name="file" :size="30" />
           </view>
           <text class="upload-title">{{ selectedFileName || '点击选择账单文件' }}</text>
           <text class="upload-sub">支持 .csv / .xlsx</text>
@@ -131,7 +131,7 @@
                 :class="{ checked: row.selected, disabled: row.status === 'duplicate' }"
                 @click="toggleRowSelect(row)"
               >
-                <text v-if="row.selected" class="check-mark">✓</text>
+                <AppIcon v-if="row.selected" name="check-2" :size="12" color="#FFFFFF" />
               </view>
 
               <view class="row-body">
@@ -188,7 +188,7 @@
 
       <view class="bottom-bar">
         <view class="remember-row">
-          <switch :checked="rememberMerchantRules" color="var(--primary-color, #4F46E5)" @change="onRememberChange" />
+          <switch :checked="rememberMerchantRules" color="var(--primary-color, #2F5D6B)" @change="onRememberChange" />
           <text class="remember-txt">记住我修改过的商户分类</text>
         </view>
         <button
@@ -205,7 +205,7 @@
     <!-- 步骤 3：结果 -->
     <view v-else-if="step === 'result'" class="result-layout animate-fade-in">
       <view class="result-icon-wrap">
-        <text class="result-icon">✅</text>
+            <AppIcon name="check-2" :size="40" />
       </view>
       <text class="result-title">导入完成</text>
       <text class="result-message">{{ importResult.message || '账单已成功写入账本' }}</text>
@@ -255,12 +255,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import IosNav from '../../components/nav/ios-nav.vue'
+import AppIcon from '../../components/common/AppIcon.vue'
 import CategoryPicker from '../../components/common/CategoryPicker.vue'
 import BottomPicker from '../../components/common/BottomPicker.vue'
-import { ledgerImportApi, taskApi } from '../../common/api'
+import { assetApi, ledgerImportApi, taskApi } from '../../common/api'
 import { coalesce } from '../../common/utils/coalesce.js'
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import { formatDate, formatPrice } from '../../pages/js/utils.js'
+import { goBackSafe } from '@/common/utils/nav.js'
 import {
   toEditableRow,
   toConfirmRow,
@@ -311,16 +313,16 @@ const sourceOptions = [
   {
     code: 'wechat',
     name: '微信支付',
-    icon: '💬',
+    iconPath: '/static/brand/wechat-pay.png',
     hint: '微信官方账单',
-    exportTip: '微信 → 我 → 服务 → 钱包 → 账单 → 右上角 ··· → 导出账单'
+    exportTip: '在微信里依次进入「我」「服务」「钱包」「账单」，点右上角菜单选导出账单'
   },
   {
     code: 'alipay',
     name: '支付宝',
-    icon: '💙',
+    iconPath: '/static/brand/alipay.png',
     hint: '支付宝官方账单',
-    exportTip: '支付宝 → 我的 → 账单 → 右上角 ··· → 导出'
+    exportTip: '在支付宝里依次进入「我的」「账单」，点右上角菜单选导出'
   }
 ]
 
@@ -359,19 +361,33 @@ onMounted(() => {
 
 const loadCategoryData = async () => {
   try {
-    const [expRes, incRes, payRes] = await Promise.all([
-      ledgerImportApi.getCategoryTree('expense').catch(() => null),
-      ledgerImportApi.getCategoryTree('income').catch(() => null),
-      ledgerImportApi.getPayMethods()
+    const [expRes, incRes, payRes, accountRes] = await Promise.all([
+      ledgerImportApi.getCategoryTree(roomId.value, 'expense').catch(() => null),
+      ledgerImportApi.getCategoryTree(roomId.value, 'income').catch(() => null),
+      ledgerImportApi.getPayMethods(roomId.value),
+      assetApi.listAccounts(roomId.value).catch(() => null)
     ])
     const merged = []
-    if (expRes && expRes.code === 0 && Array.isArray(expRes.data)) merged.push(...expRes.data)
-    if (incRes && incRes.code === 0 && Array.isArray(incRes.data)) merged.push(...incRes.data)
+    const flattenTree = (response) => {
+      if (!response || response.code !== 0 || !Array.isArray(response.data)) return []
+      return response.data.flatMap((group) =>
+        (group.children || []).map((child) => ({
+          ...child,
+          label: child.label || child.name,
+          type: group.type,
+          parentId: child.parentId || ''
+        }))
+      )
+    }
+    merged.push(...flattenTree(expRes), ...flattenTree(incRes))
     if (merged.length) {
       categories.value = merged
     } else {
-      const fallback = await taskApi.getcategoryList({})
+      const fallback = await taskApi.getcategoryList({ roomId: roomId.value })
       if (fallback.code === 0) categories.value = fallback.data || []
+    }
+    if (!accountId.value && accountRes && accountRes.code === 0) {
+      accountId.value = accountRes.data?.[0]?.id || ''
     }
     if (payRes.code === 0) {
       payOptions.value = (payRes.data || []).map((p) => ({
@@ -430,7 +446,14 @@ const runPreview = async () => {
       return
     }
     const data = res.data || {}
-    previewMeta.value = data
+    const duplicateCount = Number(data.duplicates || 0)
+    const totalCount = Number(data.total || (data.rows || []).length || 0)
+    previewMeta.value = {
+      ...data,
+      sourceName: billSource.value === 'alipay' ? '支付宝账单' : '微信支付账单',
+      duplicate: duplicateCount,
+      importable: Math.max(0, totalCount - duplicateCount)
+    }
     merchantHints.value = data.merchantHints || []
     editableRows.value = (data.rows || []).map(toEditableRow)
     if (data.source) billSource.value = data.source
@@ -559,8 +582,8 @@ const runConfirm = async () => {
   isConfirming.value = true
   try {
     const res = await ledgerImportApi.confirm({
-      roomId: Number(roomId.value),
-      accountId: Number(accountId.value),
+      roomId: roomId.value,
+      accountId: accountId.value,
       skipDuplicates: true,
       rememberMerchantRules: rememberMerchantRules.value,
       rows: selected.map(toConfirmRow)
@@ -569,7 +592,15 @@ const runConfirm = async () => {
       uni.showToast({ title: getApiMessage(res), icon: 'none', duration: 3000 })
       return
     }
-    importResult.value = res.data || {}
+    const result = res.data || {}
+    importResult.value = {
+      ...result,
+      imported: result.success || 0,
+      duplicate: 0,
+      skipped: result.skipped || 0,
+      failed: result.failed || 0,
+      message: result.failed ? `成功导入 ${result.success || 0} 条，失败 ${result.failed} 条` : `已成功导入 ${result.success || 0} 条记录`
+    }
     step.value = 'result'
     uni.$emit('refresh_ledger_data')
   } catch (e) {
@@ -611,7 +642,7 @@ const onNavBack = () => {
     finishImport()
     return
   }
-  uni.navigateBack()
+  goBackSafe()
 }
 </script>
 
@@ -631,18 +662,18 @@ const onNavBack = () => {
 
 .hero-card {
   background: #fff;
-  border-radius: 24px;
+  border-radius: var(--radius-lg, 16px);
   padding: 24px;
   margin-bottom: 24px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
-.hero-title { display: block; font-size: 20px; font-weight: 900; color: #0F172A; margin-bottom: 8px; }
-.hero-desc { display: block; font-size: 13px; color: #64748B; line-height: 1.6; }
+.hero-title { display: block; font-size: 20px; font-weight: 600; color: var(--text-ink, #0F172A); margin-bottom: 8px; }
+.hero-desc { display: block; font-size: 13px; color: var(--text-sub, #64748B); line-height: 1.6; }
 
 .section-label {
   font-size: 12px;
-  font-weight: 800;
-  color: #94A3B8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   letter-spacing: 0.08em;
   margin-bottom: 12px;
 }
@@ -652,43 +683,43 @@ const onNavBack = () => {
   flex: 1;
   min-width: 0;
   background: #fff;
-  border-radius: 20px;
+  border-radius: var(--radius-lg, 16px);
   padding: 18px 14px;
   border: 2px solid transparent;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
   box-sizing: border-box;
 }
 .source-card.active {
-  border-color: var(--primary-color, #4F46E5);
-  background: rgba(79, 70, 229, 0.04);
+  border-color: var(--primary-color, #2F5D6B);
+  background: rgba(47, 93, 107, 0.04);
 }
-.source-icon { font-size: 28px; display: block; margin-bottom: 8px; }
-.source-name { display: block; font-size: 15px; font-weight: 800; color: #0F172A; }
-.source-hint { display: block; font-size: 11px; color: #94A3B8; margin-top: 4px; }
+.source-icon { width: 36px; height: 36px; display: block; margin-bottom: 8px; border-radius: var(--radius-sm, 8px); }
+.source-name { display: block; font-size: 15px; font-weight: 600; color: var(--text-ink, #0F172A); }
+.source-hint { display: block; font-size: 11px; color: var(--text-muted, #94A3B8); margin-top: 4px; }
 
 .tip-card {
-  background: #FFFBEB;
+  background: var(--color-warning-soft, #FFFBEB);
   border: 1px solid #FDE68A;
-  border-radius: 16px;
+  border-radius: var(--radius-lg, 16px);
   padding: 14px 16px;
   margin-bottom: 20px;
   box-sizing: border-box;
 }
-.tip-title { display: block; font-size: 12px; font-weight: 800; color: #B45309; margin-bottom: 6px; }
+.tip-title { display: block; font-size: 12px; font-weight: 600; color: #B45309; margin-bottom: 6px; }
 .tip-body { display: block; font-size: 13px; color: #92400E; line-height: 1.5; word-break: break-all; }
 
 .upload-zone {
   background: #fff;
-  border: 2px dashed #CBD5E1;
-  border-radius: 20px;
+  border: 2px dashed var(--text-faint, #CBD5E1);
+  border-radius: var(--radius-lg, 16px);
   padding: 32px 20px;
   text-align: center;
   margin-bottom: 24px;
   box-sizing: border-box;
 }
 .upload-icon-wrap {
-  width: 56px; height: 56px; border-radius: 16px;
-  background: var(--primary-soft, #EEF2FF);
+  width: 56px; height: 56px; border-radius: var(--radius-lg, 16px);
+  background: var(--primary-soft, #E9F0F2);
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 12px;
 }
@@ -696,22 +727,22 @@ const onNavBack = () => {
 .upload-title {
   display: block;
   font-size: 15px;
-  font-weight: 800;
-  color: #0F172A;
+  font-weight: 600;
+  color: var(--text-ink, #0F172A);
   word-break: break-all;
   padding: 0 8px;
 }
-.upload-sub { display: block; font-size: 12px; color: #94A3B8; margin-top: 6px; }
+.upload-sub { display: block; font-size: 12px; color: var(--text-muted, #94A3B8); margin-top: 6px; }
 
 .primary-btn {
   width: 100%;
   height: 52px;
   line-height: 52px;
-  background: var(--primary-color, #4F46E5);
+  background: var(--primary-color, #2F5D6B);
   color: #fff;
-  border-radius: 16px;
+  border-radius: var(--radius-lg, 16px);
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 600;
   border: none;
   box-sizing: border-box;
 }
@@ -721,10 +752,10 @@ const onNavBack = () => {
   height: 48px;
   line-height: 48px;
   background: transparent;
-  color: #64748B;
+  color: var(--text-sub, #64748B);
   border: none;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   margin-top: 12px;
 }
 
@@ -742,7 +773,7 @@ const onNavBack = () => {
   margin: 12px 16px 0;
   padding: 16px;
   background: #fff;
-  border-radius: 20px;
+  border-radius: var(--radius-lg, 16px);
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
   box-sizing: border-box;
 }
@@ -750,21 +781,21 @@ const onNavBack = () => {
 .summary-source {
   display: block;
   font-size: 16px;
-  font-weight: 900;
-  color: #0F172A;
+  font-weight: 600;
+  color: var(--text-ink, #0F172A);
 }
 .summary-total {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: #94A3B8;
-  font-weight: 700;
+  color: var(--text-muted, #94A3B8);
+  font-weight: 600;
 }
 .summary-metrics {
   display: flex;
   align-items: center;
   background: #F8FAFC;
-  border-radius: 14px;
+  border-radius: var(--radius-md, 12px);
   padding: 12px 8px;
 }
 .metric-item {
@@ -772,26 +803,26 @@ const onNavBack = () => {
   text-align: center;
   min-width: 0;
 }
-.metric-item.ok .metric-num { color: #10B981; }
-.metric-item.warn .metric-num { color: #F59E0B; }
+.metric-item.ok .metric-num { color: var(--color-income, #10B981); }
+.metric-item.warn .metric-num { color: var(--color-warning, #F59E0B); }
 .metric-num {
   display: block;
   font-size: 20px;
-  font-weight: 900;
-  color: #0F172A;
+  font-weight: 600;
+  color: var(--text-ink, #0F172A);
   line-height: 1.2;
 }
 .metric-label {
   display: block;
   margin-top: 2px;
   font-size: 10px;
-  color: #94A3B8;
-  font-weight: 800;
+  color: var(--text-muted, #94A3B8);
+  font-weight: 600;
 }
 .metric-divider {
   width: 1px;
   height: 28px;
-  background: #E2E8F0;
+  background: var(--line-hairline, #E2E8F0);
   flex-shrink: 0;
 }
 
@@ -803,17 +834,17 @@ const onNavBack = () => {
 }
 .filter-chip {
   padding: 7px 16px;
-  border-radius: 100px;
+  border-radius: var(--radius-pill, 999px);
   background: #fff;
   font-size: 12px;
-  font-weight: 800;
-  color: #64748B;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 .filter-chip.active {
-  background: var(--primary-color, #4F46E5);
+  background: var(--primary-color, #2F5D6B);
   color: #fff;
-  box-shadow: 0 4px 12px var(--primary-glow, rgba(79, 70, 229, 0.25));
+  box-shadow: 0 4px 12px var(--primary-glow, rgba(47, 93, 107, 0.25));
 }
 
 .hint-scroll {
@@ -825,8 +856,8 @@ const onNavBack = () => {
 .hint-row { display: inline-flex; gap: 10px; padding-right: 16px; }
 .hint-card {
   width: 240px;
-  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
-  border-radius: 14px;
+  background: linear-gradient(135deg, var(--color-warning-soft, #FFFBEB) 0%, #FEF3C7 100%);
+  border-radius: var(--radius-md, 12px);
   padding: 12px;
   white-space: normal;
   display: inline-block;
@@ -837,16 +868,16 @@ const onNavBack = () => {
   margin-top: 8px;
   display: inline-flex;
   padding: 5px 12px;
-  background: #F59E0B;
-  border-radius: 8px;
+  background: var(--color-warning, #F59E0B);
+  border-radius: var(--radius-sm, 8px);
 }
-.hint-action text { font-size: 11px; font-weight: 800; color: #fff; }
+.hint-action text { font-size: 11px; font-weight: 600; color: #fff; }
 .hint-tip {
   display: block;
   margin-top: 8px;
   font-size: 11px;
   color: #B45309;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .preview-list {
@@ -864,7 +895,7 @@ const onNavBack = () => {
 .preview-row {
   width: 100%;
   background: #fff;
-  border-radius: 18px;
+  border-radius: var(--radius-lg, 16px);
   padding: 14px;
   margin-bottom: 10px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
@@ -889,8 +920,8 @@ const onNavBack = () => {
 .row-check {
   width: 22px;
   height: 22px;
-  border-radius: 7px;
-  border: 2px solid #CBD5E1;
+  border-radius: var(--radius-sm, 8px);
+  border: 2px solid var(--text-faint, #CBD5E1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -899,11 +930,10 @@ const onNavBack = () => {
   box-sizing: border-box;
 }
 .row-check.checked {
-  background: var(--primary-color, #4F46E5);
-  border-color: var(--primary-color, #4F46E5);
+  background: var(--primary-color, #2F5D6B);
+  border-color: var(--primary-color, #2F5D6B);
 }
 .row-check.disabled { opacity: 0.35; }
-.check-mark { color: #fff; font-size: 11px; font-weight: 900; }
 
 .row-body {
   flex: 1;
@@ -920,8 +950,8 @@ const onNavBack = () => {
   flex: 1;
   min-width: 0;
   font-size: 15px;
-  font-weight: 800;
-  color: #0F172A;
+  font-weight: 600;
+  color: var(--text-ink, #0F172A);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -929,13 +959,14 @@ const onNavBack = () => {
 .type-pill {
   flex-shrink: 0;
   padding: 2px 8px;
-  border-radius: 100px;
+  border-radius: var(--radius-pill, 999px);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
 }
-.type-pill.income { background: #FEE2E2; color: #DC2626; }
-.type-pill.expense { background: #D1FAE5; color: #059669; }
-.type-pill text { font-size: 10px; font-weight: 800; }
+/* 收入绿 / 支出红，跟全站语义色保持一致 */
+.type-pill.income { background: var(--color-income-soft, #D1FAE5); color: var(--color-income, #059669); }
+.type-pill.expense { background: var(--color-expense-soft, #FEE2E2); color: var(--color-expense, #DC2626); }
+.type-pill text { font-size: 10px; font-weight: 600; }
 
 .row-amount-row {
   display: flex;
@@ -947,22 +978,22 @@ const onNavBack = () => {
 }
 .row-amount {
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 600;
   flex-shrink: 0;
 }
-.row-amount.income { color: #EF4444; }
-.row-amount.expense { color: #10B981; }
+.row-amount.income { color: var(--color-income, #3E8E6E); }
+.row-amount.expense { color: var(--color-expense, #C4554D); }
 .meta-time {
   font-size: 11px;
-  color: #94A3B8;
-  font-weight: 700;
+  color: var(--text-muted, #94A3B8);
+  font-weight: 600;
   flex-shrink: 0;
 }
 
 .row-product {
   display: block;
   font-size: 12px;
-  color: #64748B;
+  color: var(--text-sub, #64748B);
   margin-top: 6px;
   line-height: 1.45;
   overflow: hidden;
@@ -981,23 +1012,23 @@ const onNavBack = () => {
 }
 .tag {
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 3px 8px;
-  border-radius: 6px;
-  background: #EEF2FF;
-  color: #4F46E5;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--primary-soft, #E9F0F2);
+  color: var(--primary-color, #2F5D6B);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tag.fallback { background: #FEE2E2; color: #DC2626; }
-.tag.peer_suggestion { background: #FFFBEB; color: #D97706; }
-.tag.merchant_rule { background: #ECFDF5; color: #059669; }
-.tag.duplicate-tag { background: #F1F5F9; color: #94A3B8; }
+.tag.fallback { background: var(--color-expense-soft, #FEE2E2); color: var(--color-expense, #DC2626); }
+.tag.peer_suggestion { background: var(--color-warning-soft, #FFFBEB); color: var(--color-warning, #D97706); }
+.tag.merchant_rule { background: var(--color-income-soft, #ECFDF5); color: var(--color-income, #059669); }
+.tag.duplicate-tag { background: #F1F5F9; color: var(--text-muted, #94A3B8); }
 .review-hint {
   font-size: 10px;
-  color: #D97706;
+  color: var(--color-warning, #D97706);
   line-height: 1.4;
   word-break: break-all;
 }
@@ -1015,7 +1046,7 @@ const onNavBack = () => {
 .edit-field {
   width: 100%;
   background: #F8FAFC;
-  border-radius: 12px;
+  border-radius: var(--radius-md, 12px);
   padding: 10px 12px;
   box-sizing: border-box;
   overflow: hidden;
@@ -1027,35 +1058,35 @@ const onNavBack = () => {
   justify-content: space-between;
   margin-bottom: 4px;
 }
-.field-label { font-size: 10px; color: #94A3B8; font-weight: 800; }
+.field-label { font-size: 10px; color: var(--text-muted, #94A3B8); font-weight: 600; }
 .field-value {
   display: block;
   font-size: 13px;
-  color: #0F172A;
-  font-weight: 700;
+  color: var(--text-ink, #0F172A);
+  font-weight: 600;
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
 }
-.field-arrow { font-size: 14px; color: #CBD5E1; flex-shrink: 0; }
+.field-arrow { font-size: 14px; color: var(--text-faint, #CBD5E1); flex-shrink: 0; }
 
 .bottom-bar {
   width: 100%;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.98);
-  border-top: 1px solid #EEF2FF;
+  border-top: 1px solid var(--primary-soft, #E9F0F2);
   box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
   box-sizing: border-box;
   flex-shrink: 0;
 }
 .remember-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.remember-txt { font-size: 12px; color: #64748B; font-weight: 700; flex: 1; }
+.remember-txt { font-size: 12px; color: var(--text-sub, #64748B); font-weight: 600; flex: 1; }
 .confirm-btn { margin: 0; }
 
 .empty-preview { padding: 40px 16px; text-align: center; }
-.empty-txt { font-size: 13px; color: #94A3B8; }
+.empty-txt { font-size: 13px; color: var(--text-muted, #94A3B8); }
 
 .result-layout {
   flex: 1;
@@ -1068,13 +1099,13 @@ const onNavBack = () => {
 }
 .result-icon-wrap {
   width: 80px; height: 80px; border-radius: 50%;
-  background: #ECFDF5;
+  background: var(--color-income-soft, #ECFDF5);
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 20px;
 }
 .result-icon { font-size: 40px; }
-.result-title { font-size: 22px; font-weight: 900; color: #0F172A; margin-bottom: 8px; }
-.result-message { font-size: 14px; color: #64748B; text-align: center; line-height: 1.6; margin-bottom: 24px; }
+.result-title { font-size: 22px; font-weight: 600; color: var(--text-ink, #0F172A); margin-bottom: 8px; }
+.result-message { font-size: 14px; color: var(--text-sub, #64748B); text-align: center; line-height: 1.6; margin-bottom: 24px; }
 .result-stats {
   display: flex;
   gap: 16px;
@@ -1083,8 +1114,8 @@ const onNavBack = () => {
   justify-content: center;
 }
 .result-stat { text-align: center; min-width: 56px; }
-.rs-val { display: block; font-size: 22px; font-weight: 900; color: #0F172A; }
-.rs-label { display: block; font-size: 11px; color: #94A3B8; margin-top: 4px; font-weight: 700; }
+.rs-val { display: block; font-size: 22px; font-weight: 600; color: var(--text-ink, #0F172A); }
+.rs-label { display: block; font-size: 11px; color: var(--text-muted, #94A3B8); margin-top: 4px; font-weight: 600; }
 
 .animate-fade-in { animation: fadeIn 0.35s ease; }
 @keyframes fadeIn {

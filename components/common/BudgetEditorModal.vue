@@ -15,7 +15,7 @@
           class="main-budget-input" 
           placeholder="0.00" 
           :focus="true"
-          placeholder-style="color: #E2E8F0"
+          placeholder-style="color: var(--text-faint, #66788D)"
         />
       </view>
       <view class="input-focus-line"></view>
@@ -70,12 +70,14 @@ const handleSave = () => {
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .budget-input-content { padding-top: 8px; }
 .amount-field-wrap { display: flex; align-items: baseline; gap: 12px; }
-.currency-label { font-size: 24px; font-weight: 900; color: var(--primary-color, #4F46E5); }
+.currency-label { font-size: 24px; font-weight: 600; color: var(--primary-color, #2F5D6B); }
 .main-budget-input { 
-  flex: 1; height: 60px; font-size: 40px; font-weight: 900; color: #1E293B; 
-  letter-spacing: -1px;
+  flex: 1; height: 60px; font-size: 40px; font-weight: 600; color: var(--text-ink, #1E293B); 
+  letter-spacing: 0;
 }
 
 .input-focus-line { 
@@ -83,12 +85,12 @@ const handleSave = () => {
 }
 .input-focus-line::after {
   content: ''; position: absolute; left: 0; top: 0; width: 30%; height: 100%; 
-  background: var(--primary-color, #4F46E5); border-radius: 10px; opacity: 0.8;
+  background: var(--primary-color, #2F5D6B); border-radius: 10px; opacity: 0.8;
 }
 
 .helper-text-row { display: flex; justify-content: space-between; margin-top: 16px; }
-.helper-info { font-size: 12px; font-weight: 800; color: #64748B; }
-.helper-hint { font-size: 11px; font-weight: 600; color: #CBD5E1; }
+.helper-info { font-size: 12px; font-weight: 600; color: var(--text-sub, #64748B); }
+.helper-hint { font-size: 11px; font-weight: 600; color: var(--text-faint, #CBD5E1); }
 
 .confirm-save-btn {
   width: 100%; height: 64px;
@@ -99,5 +101,5 @@ const handleSave = () => {
   transition: background 0.35s ease, box-shadow 0.35s ease;
 }
 .confirm-save-btn:active { transform: scale(0.98); opacity: 0.9; }
-.btn-txt { color: #fff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; }
+.btn-txt { color: #fff; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; }
 </style>

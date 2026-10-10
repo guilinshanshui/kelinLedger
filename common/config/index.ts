@@ -1,7 +1,7 @@
-import type { AppConfig, Theme } from '@/types'
+import type { AppConfig } from '@/types'
 
 /** 应用版本号（UI 展示与业务逻辑统一从此读取） */
-export const APP_VERSION = '2.0.0'
+export const APP_VERSION = '2.1.7'
 
 /** 带 v 前缀的版本文案，如 v2.0.0 */
 export function formatAppVersion(withPrefix = true) {
@@ -10,126 +10,19 @@ export function formatAppVersion(withPrefix = true) {
 
 // 应用配置
 export const appConfig: AppConfig = {
-  apiBaseUrl: 'https://your-domain.com/QuestionBank1/', // 生产环境替换为实际 API 地址
-  appId: 'wxYOUR_WECHAT_APPID', // 微信小程序 AppID
+  // 云开发环境 ID。必须在微信开发者工具中创建云环境后显式填写，例如 cloud1-xxxxxxxx。
+  // 未填写时前端会直接提示配置环境，不会发起云函数调用。
+  // 多环境（开发/体验/生产）建议各自建一个环境，在这里按需切换。
+  cloudEnv: 'cloudbase-d0g5v4tf442146566' as string,
+
+  // 云函数名称，需与 cloudfunctions/ 下的目录名一致
+  cloudFunctionName: 'roomie',
+
+  // 微信小程序 AppID，需与 manifest.json 中 mp-weixin.appid 保持一致
+  appId: 'wx8ab87add7a9a0f11',
+
   version: APP_VERSION
 }
-
-// 默认主题配置
-export const defaultTheme: Theme = {
-  id: 'default',
-  name: '默认主题',
-  primaryColor: '#007AFF',
-  secondaryColor: '#5AC8FA',
-  backgroundColor: '#F5F5F5',
-  textColor: '#333333',
-  cardBackground: '#FFFFFF',
-  borderColor: '#E5E5E5',
-  images: {
-    logo: '/static/logo.png'
-  }
-}
-
-// 深色主题
-export const darkTheme: Theme = {
-  id: 'dark',
-  name: '深色主题',
-  primaryColor: '#0EA5E9',
-  secondaryColor: '#38BDF8',
-  backgroundColor: '#0F172A',
-  textColor: '#F8FAFC',
-  cardBackground: '#1E293B',
-  borderColor: '#334155',
-  images: {
-    logo: '/static/logo-dark.png'
-  }
-}
-
-// 清新绿意主题
-export const greenTheme: Theme = {
-  id: 'green',
-  name: '清新绿意',
-  primaryColor: '#10B981',
-  secondaryColor: '#34D399',
-  backgroundColor: '#F0FDF4',
-  textColor: '#064E3B',
-  cardBackground: '#FFFFFF',
-  borderColor: '#D1FAE5',
-  images: {
-    logo: '/static/logo-green.png'
-  }
-}
-
-// 温暖橙色主题
-export const orangeTheme: Theme = {
-  id: 'orange',
-  name: '温暖橙色',
-  primaryColor: '#F97316',
-  secondaryColor: '#FB923C',
-  backgroundColor: '#FFF7ED',
-  textColor: '#9A3412',
-  cardBackground: '#FFFFFF',
-  borderColor: '#FED7AA',
-  images: {
-    logo: '/static/logo-orange.png'
-  }
-}
-
-// 浪漫紫色主题
-export const purpleTheme: Theme = {
-  id: 'purple',
-  name: '浪漫紫色',
-  primaryColor: '#8B5CF6',
-  secondaryColor: '#A78BFA',
-  backgroundColor: '#FAF5FF',
-  textColor: '#581C87',
-  cardBackground: '#FFFFFF',
-  borderColor: '#DDD6FE',
-  images: {
-    logo: '/static/logo-purple.png'
-  }
-}
-
-// 活力粉色主题
-export const pinkTheme: Theme = {
-  id: 'pink',
-  name: '活力粉色',
-  primaryColor: '#EC4899',
-  secondaryColor: '#F472B6',
-  backgroundColor: '#FDF2F8',
-  textColor: '#831843',
-  cardBackground: '#FFFFFF',
-  borderColor: '#FBCFE8',
-  images: {
-    logo: '/static/logo-pink.png'
-  }
-}
-
-// 商务蓝色主题
-export const blueTheme: Theme = {
-  id: 'blue',
-  name: '商务蓝色',
-  primaryColor: '#2563EB',
-  secondaryColor: '#3B82F6',
-  backgroundColor: '#EFF6FF',
-  textColor: '#1E3A8A',
-  cardBackground: '#FFFFFF',
-  borderColor: '#BFDBFE',
-  images: {
-    logo: '/static/logo-blue.png'
-  }
-}
-
-// 预设主题列表
-export const themes: Theme[] = [
-  defaultTheme,
-  darkTheme,
-  greenTheme,
-  orangeTheme,
-  purpleTheme,
-  pinkTheme,
-  blueTheme
-]
 
 // API接口路径
 export const API_PATHS = {
@@ -158,7 +51,7 @@ export const API_PATHS = {
   LEDGER_DAY_LIST:'/ledger/today',//今天记账明细数据
   LEDGER_MONTH_LIST:'/ledger/month',//本月记账明细数据
   LEDGER_YEAR_LIST:'/ledger/year',//本年记账明细数据
-  LEDGER_GRADP:'/ledger/groupLedgers',//下旬分类下边的明细
+  LEDGER_RANGE:'/ledger/range',//自定义起止区间的记账明细
   LEDGER_CATEOGER_LIST:'/ledger/category/list',//获取支付分类
   LEDGER_CATEGORY_TREE:'/ledger/category/tree',//分类树（账单导入改分类）
   LEDGER_IMPORT_PREVIEW:'/ledger/import/preview',//账单导入预览
@@ -166,13 +59,11 @@ export const API_PATHS = {
   LEDGER_IMPORT_MERCHANT_RULES:'/ledger/import/merchant-rules',//商户分类记忆
   ROOM_LIST:'/room/rooms',//房间列表
   ROOM_JOIN: '/room/join',
-  ROOM_ROOMS:'/room/permission/rooms',//room/permission/rooms 获取房间列表
-  ROOM_PERMISSION_MEMBER:'/room/permission/detail',//room/permission/detail//获取房间的成员列表
   ROOM_PERMISSION_UPDATE_ROLE:'/room/permission/updateRole',//room/permission/updateRole //修改成员权限
   ROOM_REMOVE_MEMBER:'/roomNumber/removeMember',//移除房间成员
   ROOM_DASHBOARD:'/room/dashboard/overview', //dashboard
+  DASHBOARD_HOME: '/dashboard/home',//看板首屏聚合（房间详情+成员+流水列表+流水汇总）
   ROOM_INFO: '/roomDetail/detail',//房间详情
-  ROOM_UPDATE: '/room/updateName',//修改房间名称
   ROOM_DELETE: '/room/delete',//删除房间
   ROOM_MEMBERS: '/roomDetail/members',//获取成员列表
   ROOM_INVITE: '/room/invite',
@@ -202,6 +93,7 @@ export const API_PATHS = {
   SCHEDULE_CREATE: '/schedule/add',
   SCHEDULE_UPDATE: '/schedule/update',
   SCHEDULE_DELETE: '/schedule/delete',
+  SCHEDULE_RUN_DUE: '/schedule/runDue',
 
   // 动态相关
   FEED_LIST: '/feed/list',
@@ -219,8 +111,62 @@ export const API_PATHS = {
   NOTIFICATION_ALER_READ:'/notifications/markAsRead',//已读
   /** 微信订阅消息模板 ID（生日/日程），由后台下发 */
   WECHAT_SUBSCRIBE_TEMPLATES: '/wechat/subscribe/templates',
-  
-  WHEEL_LIST:'/decisionWheel/list'
+
+  WHEEL_LIST:'/decisionWheel/list',
+
+  // 文件上传（云存储 fileID）
+  UPLOAD_IMAGE: '/upload/image',
+  UPLOAD_FILE: '/upload/file',
+
+  // 房间信息
+  ROOM_UPDATE_INFO: '/room/update',
+  ROOM_TRANSFER_OWNER: '/room/transferOwner',
+
+  // 成员管理
+  MEMBER_LIST: '/member/list',
+  MEMBER_LEAVE: '/member/leave',
+
+  // 清单（任务分组）
+  TASK_LISTS: '/task/listLists',
+  TASK_LIST_CREATE: '/task/createList',
+  TASK_LIST_DELETE: '/task/deleteList',
+  TASK_STATS: '/task/stats',
+
+  // 动态
+  FEED_DELETE: '/feed/delete',
+  FEED_CLEAR: '/feed/clear',
+
+  // 消息
+  NOTIFICATION_DELETE: '/notification/delete',
+  NOTIFICATION_CLEAR_ALL: '/notifications/clear',
+  NOTIFICATION_ROOM_UNREAD: '/notification/roomUnread',
+
+  // 账户与资产
+  LEDGER_ACCOUNT_LIST: '/ledger/account/list',//账户列表
+  LEDGER_ACCOUNT_SAVE: '/ledger/account/save',//新增/修改账户
+  LEDGER_ACCOUNT_DELETE: '/ledger/account/delete',//删除账户
+  LEDGER_ASSET_OVERVIEW: '/ledger/assetOverview',//资产总览
+
+  // 预算
+  LEDGER_BUDGET_LIST: '/ledger/budget/list',//预算列表
+  LEDGER_BUDGET_SAVE: '/ledger/budget/save',//保存预算
+  LEDGER_BUDGET_DELETE: '/ledger/budget/delete',//删除预算
+  LEDGER_BUDGET_PROGRESS: '/ledger/budget/progress',//预算执行进度
+
+  // 分摊结算
+  LEDGER_SETTLEMENT: '/ledger/settlement',//谁欠谁
+
+  // 周期账单
+  LEDGER_RECURRING_LIST: '/ledger/recurring/list',//周期账单列表
+  LEDGER_RECURRING_SAVE: '/ledger/recurring/save',//保存周期账单
+  LEDGER_RECURRING_DELETE: '/ledger/recurring/delete',//删除周期账单
+  LEDGER_RECURRING_GENERATE: '/ledger/recurring/generate',//手动触发生成
+
+  // 导出
+  LEDGER_EXPORT: '/ledger/exportCsv',
+
+  // 统计分析：自然月 / 自然年 / 全部 / 自定义
+  LEDGER_STATS: '/ledger/stats'
 }
 
 // 本地存储键名
@@ -228,7 +174,6 @@ export const STORAGE_KEYS = {
   TOKEN: 'roomie_token',
   USER_INFO: 'roomie_user_info',
   CURRENT_ROOM: 'roomie_current_room',
-  THEME: 'roomie_theme',
   SETTINGS: 'roomie_settings'
 }
 

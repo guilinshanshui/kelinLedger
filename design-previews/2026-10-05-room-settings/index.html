@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roomie 账本设置视觉验收</title>
+  <style>
+    :root {
+      --primary: #2F5D6B;
+      --primary-soft: #E9F0F2;
+      --bg: #F6F8F8;
+      --card: #FFFFFF;
+      --ink: #1E293B;
+      --sub: #64748B;
+      --muted: #94A3B8;
+      --line: #E8EEEF;
+      --expense: #C4554D;
+      --expense-soft: #F6E7E5;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px;
+      background: #EEF2F2;
+      color: var(--ink);
+      overflow-x: hidden;
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+    .lead { margin: 0 0 24px; color: var(--sub); }
+    .stage {
+      display: grid;
+      grid-template-columns: repeat(3, 390px);
+      gap: 22px;
+      align-items: start;
+    }
+    .phone {
+      width: 390px;
+      height: 844px;
+      overflow: hidden;
+      background: var(--bg);
+      border: 1px solid #DCE5E6;
+      border-radius: 24px;
+      box-shadow: 0 18px 50px rgba(30, 41, 59, .10);
+    }
+    .nav {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      font-size: 17px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--line);
+    }
+    .content { padding: 14px 16px 28px; }
+    .hero, .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+    }
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .book-icon {
+      width: 52px; height: 52px; flex: 0 0 auto;
+      display: grid; place-items: center;
+      border-radius: var(--radius-md);
+      background: var(--primary-soft);
+      font-size: 24px;
+    }
+    .hero-copy { flex: 1; min-width: 0; }
+    .hero-title { font-size: 18px; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 12px; }
+    .tag {
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #F4E9D8;
+      color: #8A5B22;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .section-title { margin: 0 4px 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .form { padding: 16px; }
+    .field + .field { margin-top: 16px; }
+    .label { display: block; margin-bottom: 8px; color: var(--sub); font-size: 13px; }
+    .input, .textarea {
+      width: 100%;
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #F8FAFA;
+      color: var(--ink);
+    }
+    .textarea { min-height: 72px; padding-top: 11px; align-items: flex-start; color: var(--muted); }
+    .icons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .icon {
+      height: 44px; display: grid; place-items: center;
+      border: 1px solid var(--line); border-radius: var(--radius-md); background: #F8FAFA; font-size: 20px;
+    }
+    .icon.active { border-color: var(--primary); background: var(--primary-soft); }
+    .primary {
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius-md);
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+    }
+    .save { margin-top: 20px; }
+    .section { margin-bottom: 20px; }
+    .list { overflow: hidden; }
+    .row {
+      min-height: 68px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row-icon {
+      width: 42px; height: 42px; flex: 0 0 auto;
+      display: grid; place-items: center;
+      border-radius: var(--radius-md);
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 11px; font-weight: 600;
+    }
+    .row-icon.neutral { background: #EEF2F5; color: #607080; }
+    .row-icon.danger { background: var(--expense-soft); color: var(--expense); }
+    .row-copy { flex: 1; min-width: 0; }
+    .row-title { font-weight: 500; }
+    .row-desc { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .arrow { color: #CBD5E1; font-size: 20px; }
+    .danger { color: var(--expense); }
+    .avatar {
+      width: 44px; height: 44px; flex: 0 0 auto;
+      border-radius: var(--radius-md);
+      background: var(--primary-soft);
+      display: grid; place-items: center;
+      color: var(--primary); font-weight: 600;
+    }
+    .member-copy { flex: 1; min-width: 0; }
+    .role { padding: 4px 8px; border-radius: 999px; background: #F1F5F9; color: var(--sub); font-size: 11px; }
+    .role.admin { background: var(--primary-soft); color: var(--primary); }
+    .role.owner { background: #F4E9D8; color: #8A5B22; }
+    .action { color: var(--primary); font-size: 12px; font-weight: 500; }
+    .action.remove { color: var(--expense); }
+    .hint { padding: 0 4px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    @media (max-width: 900px) {
+      body { padding: 16px; }
+      .stage { grid-template-columns: 1fr; justify-items: center; }
+    }
+    @media (max-width: 420px) {
+      body { padding: 0; }
+      .stage { gap: 0; }
+      .phone { width: 100%; max-width: 390px; border: 0; border-radius: 0; box-shadow: none; }
+      h1, .lead { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Roomie 账本设置视觉验收</h1>
+  <p class="lead">设计方向样机，用于检查移动端层级、密度与危险操作。不是最终小程序运行截图。</p>
+  <main class="stage">
+    <section class="phone">
+      <div class="nav">账本设置</div>
+      <div class="content">
+        <div class="hero">
+          <div class="book-icon">📒</div>
+          <div class="hero-copy">
+            <div class="hero-title">幸福一家</div>
+            <div class="meta">4 位成员 · 创建者</div>
+          </div>
+          <div class="tag">创建者</div>
+        </div>
+        <div class="section">
+          <div class="section-title">账本资料</div>
+          <div class="card form">
+            <div class="field"><span class="label">账本名称</span><div class="input">幸福一家</div></div>
+            <div class="field"><span class="label">账本图标</span><div class="icons"><div class="icon active">📒</div><div class="icon">🏠</div><div class="icon">🧾</div><div class="icon">🎯</div></div></div>
+            <div class="field"><span class="label">账本说明</span><div class="textarea">家庭日常收支与共同目标</div></div>
+            <div class="field"><span class="label">月度预算（元）</span><div class="input">8,000</div></div>
+            <div class="primary save">保存账本资料</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">账本操作</div>
+          <div class="card list">
+            <div class="row"><div class="row-icon neutral">转让</div><div class="row-copy"><div class="row-title">转让创建者</div><div class="row-desc">转让后你将变为管理员</div></div><div class="arrow">›</div></div>
+            <div class="row"><div class="row-icon danger">解散</div><div class="row-copy"><div class="row-title danger">解散账本</div><div class="row-desc">解散后成员将失去访问权限</div></div><div class="arrow danger">›</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="phone">
+      <div class="nav">账本设置</div>
+      <div class="content">
+        <div class="hero">
+          <div class="book-icon">🏠</div>
+          <div class="hero-copy">
+            <div class="hero-title">租房共同账本</div>
+            <div class="meta">3 位成员 · 成员</div>
+          </div>
+          <div class="tag" style="background:#F1F5F9;color:#64748B">成员</div>
+        </div>
+        <div class="section">
+          <div class="section-title">协作管理</div>
+          <div class="card list">
+            <div class="row"><div class="row-icon">成员</div><div class="row-copy"><div class="row-title">成员与权限</div><div class="row-desc">查看成员和角色</div></div><div class="arrow">›</div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">账本操作</div>
+          <div class="card list">
+            <div class="row"><div class="row-icon danger">退出</div><div class="row-copy"><div class="row-title danger">退出账本</div><div class="row-desc">退出后可再次通过邀请加入</div></div><div class="arrow danger">›</div></div>
+          </div>
+        </div>
+        <p class="hint">普通成员不会看到修改资料、邀请、转让和解散入口，避免无权限操作造成失败。</p>
+      </div>
+    </section>
+
+    <section class="phone">
+      <div class="nav">成员与权限</div>
+      <div class="content">
+        <div class="hero">
+          <div class="book-icon">📒</div>
+          <div class="hero-copy">
+            <div class="hero-title">幸福一家</div>
+            <div class="meta">4 位成员 · 管理员</div>
+          </div>
+          <div class="action">切换</div>
+        </div>
+        <div class="section">
+          <div class="section-title">创建者</div>
+          <div class="card list">
+            <div class="row"><div class="avatar">林</div><div class="member-copy"><div class="row-title">小林</div><div class="row-desc">负责账本创建与最终决策</div></div><div class="role owner">创建者</div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">协作成员</div>
+          <div class="card list">
+            <div class="row"><div class="avatar">陈</div><div class="member-copy"><div class="row-title">小陈</div><div class="row-desc">管理员 · 当前账号</div></div><div class="role admin">管理员</div><div class="action">调整</div></div>
+            <div class="row"><div class="avatar">周</div><div class="member-copy"><div class="row-title">小周</div><div class="row-desc">成员</div></div><div class="role">成员</div><div class="action">调整</div><div class="action remove">移除</div></div>
+            <div class="row"><div class="avatar">吴</div><div class="member-copy"><div class="row-title">小吴</div><div class="row-desc">只读成员</div></div><div class="role">只读成员</div><div class="action">调整</div><div class="action remove">移除</div></div>
+          </div>
+        </div>
+        <p class="hint">管理员不能修改同级管理员和创建者；每个人都不能修改自己的权限。</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -3,27 +3,33 @@
   <view 
     class="picker-mask" 
     v-show="modelValue"
-    :class="{ 'mask-active': modelValue, 'mask-closing': isClosing }"
+    :class="[themeClass, { 'mask-active': modelValue, 'mask-closing': isClosing }]"
     @click="handleClose"
     @touchmove.stop.prevent
   >
     <view 
       class="picker-panel" 
       :class="{ 'panel-active': modelValue }"
-      :style="{ transform: `translateY(${panelY}px)`, transition: isSwiping ? 'none' : 'transform 0.5s cubic-bezier(0.2, 1, 0.2, 1)' }"
+      :style="panelStyle"
       @click.stop
-      @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
     >
-      <view class="picker-handle" :style="{ background: primaryColor }"></view>
-      
-      <view class="picker-header">
-        <view class="header-icon-wrap">
-          <text class="header-icon">🎨</text>
-        </view>
-        <text class="main-title">个性空间换肤</text>
-        <text class="sub-label">精选配色，一键切换您的家庭氛围</text>
+      <!-- 拖拽关闭只绑在头部，主题列表的滚动交给 scroll-view -->
+      <view
+        class="picker-drag-zone"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+        @touchcancel="onTouchEnd"
+      >
+        <view class="picker-handle" :style="{ background: primaryColor }"></view>
+
+          <view class="picker-header">
+            <view class="header-icon-wrap">
+              <AppIcon name="palette-2" :size="20" />
+            </view>
+            <text class="main-title">个性空间换肤</text>
+            <text class="sub-label">精选配色，一键切换您的家庭氛围</text>
+          </view>
       </view>
 
       <scroll-view scroll-y class="theme-scroll" :show-scrollbar="false">
@@ -31,6 +37,7 @@
           <view 
             v-for="(t, index) in themes" 
             :key="t.id"
+            :id="'theme-' + t.id"
             class="theme-item"
             hover-class="theme-item-press"
             :class="{ 'active': currentSelected === t.id, 'item-animate': modelValue }"
@@ -54,7 +61,7 @@
                 class="selected-badge"
                 :style="{ background: t.primary, boxShadow: `0 4px 12px ${t.primary}55` }"
               >
-                <text class="check-icon">✓</text>
+                <AppIcon name="check-2" :size="14" color="#FFFFFF" />
               </view>
             </view>
             <text class="theme-name">{{ t.name }}</text>
@@ -70,31 +77,32 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useAppTheme } from '@/common/themes/useAppTheme.js';
-import { getStoredAppThemeId, setAppThemeId } from '@/common/themes/appTheme';
+import { ref, watch, computed } from 'vue';
+import { useAppTheme } from '@/common/themes/useAppTheme.js'
+import { SHEET_CURVE, SHEET_OPEN_MS, playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
+import { APP_THEME_PRESETS, getStoredAppThemeId, setAppThemeId } from '@/common/themes/appTheme';
 
-const { primaryColor } = useAppTheme();
+// 换肤弹窗自己也要吃主题变量，否则切到暖赭后弹窗仍是黛青兜底色
+const { primaryColor, themeClass } = useAppTheme();
 
 const props = defineProps({
   modelValue: Boolean
 });
 const emit = defineEmits(['update:modelValue']);
 
+watch(() => props.modelValue, (newVal) => {
+  if (newVal) playSheetOpen(panelTransform)
+})
+
 const currentSelected = ref(getStoredAppThemeId());
 const isClosing = ref(false);
 const isSwiping = ref(false);
+const sheetOpenMs = SHEET_OPEN_MS;
+const sheetCurve = SHEET_CURVE;
 const panelY = ref(0);
 let startY = 0;
 
-const themes = [
-  { id: 'indigo', name: '经典靛蓝', primary: '#4F46E5', soft: '#EEF2FF' },
-  { id: 'emerald', name: '清新翡翠', primary: '#10B981', soft: '#ECFDF5' },
-  { id: 'rose', name: '浪漫玫瑰', primary: '#F43F5E', soft: '#FFF1F2' },
-  { id: 'amber', name: '温暖琥珀', primary: '#F59E0B', soft: '#FFFBEB' },
-  { id: 'midnight', name: '极客之夜', primary: '#1E293B', soft: '#F1F5F9' },
-  { id: 'violet', name: '幻紫星云', primary: '#8B5CF6', soft: '#F5F3FF' },
-];
+const themes = APP_THEME_PRESETS;
 
 const selectTheme = (id) => {
   if (currentSelected.value === id) return;
@@ -103,9 +111,13 @@ const selectTheme = (id) => {
   handleClose();
 };
 
+const panelTransform = ref({ transform: 'translateY(100%)', transition: 'none' });
+const panelStyle = computed(() => panelTransform.value);
+
 const handleClose = () => {
+  if (isClosing.value) return;
   isClosing.value = true;
-  panelY.value = 1000;
+  const ms = playSheetClose(panelTransform);
   setTimeout(() => {
     emit('update:modelValue', false);
     isClosing.value = false;
@@ -116,27 +128,32 @@ const handleClose = () => {
 const onTouchStart = (e) => { startY = e.touches[0].clientY; isSwiping.value = true; };
 const onTouchMove = (e) => {
   const diff = e.touches[0].clientY - startY;
-  if (diff > 0) panelY.value = diff * 0.8;
+  if (diff > 0) {
+    panelY.value = diff * 0.8;
+    panelTransform.value = { transform: 'translateY(' + (diff * 0.8) + 'px)', transition: 'none' };
+  }
 };
 const onTouchEnd = () => {
   isSwiping.value = false;
   if (panelY.value > 120) handleClose();
-  else panelY.value = 0;
+  else {
+    panelY.value = 0;
+    panelTransform.value = { transform: 'translateY(0)', transition: sheetPanelTransition() };
+  }
 };
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
 .picker-mask {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   z-index: 10050;
   display: flex;
   align-items: flex-end;
   opacity: 0;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.25s ease-out;
   pointer-events: none;
 }
 .mask-active { opacity: 1; pointer-events: auto; }
@@ -144,7 +161,7 @@ const onTouchEnd = () => {
 
 .picker-panel {
   width: 100%;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: var(--bg-card, #FFFFFF);
   border-radius: 48rpx 48rpx 0 0;
   padding: 16rpx 32rpx calc(env(safe-area-inset-bottom) + 28rpx);
   box-shadow: 0 -24rpx 80rpx rgba(15, 23, 42, 0.12);
@@ -154,10 +171,16 @@ const onTouchEnd = () => {
   position: relative;
 }
 
+/* 拖拽关闭只在这个区域生效，主题列表滚动不再被面板拖走 */
+.picker-drag-zone {
+  position: relative;
+  z-index: 1;
+}
+
 .picker-handle {
   width: 72rpx;
   height: 10rpx;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2F5D6B);
   border-radius: 20rpx;
   margin: 0 auto 28rpx;
   flex-shrink: 0;
@@ -178,8 +201,8 @@ const onTouchEnd = () => {
   width: 88rpx;
   height: 88rpx;
   border-radius: 28rpx;
-  background: linear-gradient(135deg, #f1f5f9 0%, #fff 100%);
-  border: 1px solid #e2e8f0;
+  background: var(--primary-soft, #E9F0F2);
+  border: 1px solid var(--line-hairline, #E8EEEF);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -191,15 +214,15 @@ const onTouchEnd = () => {
 
 .main-title {
   font-size: 36rpx;
-  font-weight: 900;
-  color: #0f172a;
-  letter-spacing: -0.5px;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
+  letter-spacing: 0;
 }
 
 .sub-label {
   font-size: 24rpx;
-  font-weight: 600;
-  color: #94a3b8;
+  font-weight: 400;
+  color: var(--text-muted, #94A3B8);
   margin-top: 10rpx;
   display: block;
   line-height: 1.5;
@@ -223,11 +246,11 @@ const onTouchEnd = () => {
   align-items: stretch;
   gap: 16rpx;
   opacity: 0;
-  transform: translateY(24rpx);
+  transform: translateY(20rpx);
 }
 
 .item-animate {
-  animation: slideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: slideUp 0.38s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   animation-delay: var(--delay);
 }
 
@@ -242,13 +265,13 @@ const onTouchEnd = () => {
   border-radius: 32rpx;
   padding: 6rpx;
   background: #fff;
-  border: 2rpx solid #f1f5f9;
+  border: 2rpx solid var(--line-hairline, #E8EEEF);
   box-shadow: 0 8rpx 28rpx rgba(15, 23, 42, 0.06);
   transition: transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.28s ease, border-color 0.28s ease;
 }
 
 .active .swatch-card {
-  border: 3rpx solid var(--ring-color, #4f46e5);
+  border: 3rpx solid var(--ring-color, #2F5D6B);
   box-shadow: 0 16rpx 40rpx rgba(15, 23, 42, 0.12);
   transform: translateY(-4rpx);
 }
@@ -301,7 +324,7 @@ const onTouchEnd = () => {
   align-items: center;
   justify-content: center;
   border: 3rpx solid #fff;
-  animation: badgePop 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+  animation: badgePop 0.32s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @keyframes badgePop {
@@ -309,24 +332,18 @@ const onTouchEnd = () => {
   to { opacity: 1; transform: scale(1); }
 }
 
-.check-icon {
-  color: #fff;
-  font-size: 22rpx;
-  font-weight: 900;
-  line-height: 1;
-}
 
 .theme-name {
   font-size: 26rpx;
-  font-weight: 700;
-  color: #64748b;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
   text-align: center;
-  transition: color 0.25s ease, font-weight 0.25s ease;
+  transition: color 0.2s ease;
 }
 
 .active .theme-name {
-  color: #0f172a;
-  font-weight: 900;
+  color: var(--text-ink, #1E293B);
+  font-weight: 600;
 }
 
 .action-footer {
@@ -338,13 +355,14 @@ const onTouchEnd = () => {
   height: 56px;
   line-height: 56px;
   border-radius: 20px;
-  background: #0f172a;
+  background: var(--primary-color, #2F5D6B);
   color: #ffffff;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   border: none;
-  transition: all 0.3s;
+  transition: transform 0.2s, opacity 0.2s;
 }
 
 .done-btn:active { transform: scale(0.98); opacity: 0.9; }
 </style>
+import AppIcon from './AppIcon.vue';

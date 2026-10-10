@@ -86,7 +86,7 @@
         >
           <view class="b-main">
             <view class="b-title-row">
-              <text class="b-emoji">🎂</text>
+              <AppIcon name="cake" :size="16" />
               <text class="b-name">{{ b.title }}</text>
             </view>
             <text v-if="isSelectedToday && b.daysLeft === 0" class="b-status today-status">今天</text>
@@ -137,7 +137,7 @@
         >
           <view class="b-main">
             <view class="b-title-row">
-              <text class="b-emoji">🎂</text>
+              <AppIcon name="cake" :size="16" />
               <text class="b-name">{{ b.title }}</text>
             </view>
             <text class="b-date-hint">{{ formatBirthdayHintForDate(b, b.upcomingDate) }}</text>
@@ -161,7 +161,7 @@
         v-if="enrichedBirthdays.length === 0 && normalizedSchedules.length === 0"
         class="empty-state"
       >
-        <text class="empty-emoji">🎈</text>
+        <AppIcon name="air-balloon" :size="40" />
         <text class="empty-title">还没有录入生日</text>
         <text class="empty-sub">点右下角 + 添加家人生日，到期前会在这里提醒</text>
       </view>
@@ -357,8 +357,7 @@ const handleWechatReauthorize = async (birthday, event) => {
 
   try {
     uni.showLoading({ title: '保存授权...' });
-    const res = await taskApi.updateSchedule({
-      id: birthday.id,
+    const res = await taskApi.updateSchedule(birthday.id, {
       roomId: props.roomId,
       scheduleType: 'birthday',
       remindChannels,
@@ -444,7 +443,7 @@ const addTask = async (map, type) => {
 };
 
 const updateTask = async (map, type) => {
-  const res = await taskApi.updateSchedule(map);
+  const res = await taskApi.updateSchedule(map.id, map);
   if (res.code == 0) {
     markScheduleHomeDirty(props.roomId);
     getScheduleList(type === 'daily' ? 'schedule' : 'birthday');
@@ -463,8 +462,10 @@ const getScheduleList = async (scheduleType) => {
   try {
     const res = await taskApi.scheduleList({ roomId: props.roomId, scheduleType });
     if (res.code == 0 && res.data) {
-      if (scheduleType === 'schedule') rawSchedules.value = res.data.rows || [];
-      else rawBirthdays.value = res.data.rows || [];
+      // 后端 schedule/list 返回数组（历史代码误当成分页对象读 rows，导致列表永远为空）
+      const rows = Array.isArray(res.data) ? res.data : (res.data.rows || res.data.list || []);
+      if (scheduleType === 'schedule') rawSchedules.value = rows;
+      else rawBirthdays.value = rows;
     }
   } catch (e) {}
 };
@@ -582,6 +583,8 @@ const onTouchEnd = (e) => {
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 .tab-content-schedule {
   display: flex;
   flex-direction: column;
@@ -601,11 +604,11 @@ const onTouchEnd = (e) => {
 .overview-text {
   font-size: 14px;
   font-weight: 600;
-  color: #1F2937;
+  color: var(--text-ink, #1F2937);
 }
 .overview-highlight {
-  color: #635BFF;
-  font-weight: 700;
+  color: var(--primary-color, #2F5D6B);
+  font-weight: 600;
 }
 
 /* 日历导航卡片 */
@@ -633,13 +636,13 @@ const onTouchEnd = (e) => {
 }
 .arrow-sym {
   font-size: 20px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
   font-weight: 600;
 }
 .current-month-txt {
   font-size: 15px;
-  font-weight: 700;
-  color: #1F2937;
+  font-weight: 600;
+  color: var(--text-ink, #1F2937);
 }
 .weekday-header {
   display: flex;
@@ -650,7 +653,7 @@ const onTouchEnd = (e) => {
   text-align: center;
   font-size: 11px;
   font-weight: 600;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 .calendar-grid-container {
@@ -698,30 +701,30 @@ const onTouchEnd = (e) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
 }
 .is-active {
-  background: #635BFF;
+  background: var(--primary-color, #2F5D6B);
 }
 .is-active .day-num {
   color: #fff !important;
 }
 .day-num {
   font-size: 14px;
-  font-weight: 700;
-  color: #1F2937;
+  font-weight: 600;
+  color: var(--text-ink, #1F2937);
 }
 .is-today .day-num {
-  color: #635BFF;
+  color: var(--primary-color, #2F5D6B);
 }
 .is-other-month .day-num {
-  color: #CBD5E1;
+  color: var(--text-faint, #CBD5E1);
 }
 
 .lunar-txt {
   font-size: 8px;
   font-weight: 500;
-  color: #CBD5E1;
+  color: var(--text-faint, #CBD5E1);
   line-height: 1;
   margin-top: 1px;
 }
@@ -738,13 +741,13 @@ const onTouchEnd = (e) => {
   height: 4px;
   border-radius: 50%;
 }
-.dot-task { background: #635BFF; }
-.dot-birthday { background: #7C3AED; }
+.dot-task { background: var(--primary-color, #2F5D6B); }
+.dot-birthday { background: var(--secondary-color, #416F7B); }
 
 .today-strip-label {
   font-size: 9px;
-  font-weight: 700;
-  color: #635BFF;
+  font-weight: 600;
+  color: var(--primary-color, #2F5D6B);
   margin-top: 0;
   line-height: 1;
 }
@@ -757,7 +760,7 @@ const onTouchEnd = (e) => {
 .expand-text-btn text {
   font-size: 12px;
   font-weight: 500;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 /* 事件列表 */
@@ -785,26 +788,26 @@ const onTouchEnd = (e) => {
 }
 .section-title {
   font-size: 15px;
-  font-weight: 700;
-  color: #1F2937;
+  font-weight: 600;
+  color: var(--text-ink, #1F2937);
 }
 .section-sub {
   font-size: 12px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
   font-weight: 500;
 }
 .section-badge {
   flex-shrink: 0;
   font-size: 12px;
-  font-weight: 700;
-  color: #635BFF;
+  font-weight: 600;
+  color: var(--primary-color, #2F5D6B);
 }
 .section-badge.muted {
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
   font-weight: 600;
 }
 .section-title.muted {
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 /* 生日卡片 */
@@ -839,8 +842,8 @@ const onTouchEnd = (e) => {
 }
 .b-name {
   font-size: 16px;
-  font-weight: 700;
-  color: #1F2937;
+  font-weight: 600;
+  color: var(--text-ink, #1F2937);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -849,19 +852,19 @@ const onTouchEnd = (e) => {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #7C3AED;
+  color: var(--secondary-color, #416F7B);
   margin-bottom: 4px;
 }
 .b-status.today-status {
-  color: #635BFF;
+  color: var(--primary-color, #2F5D6B);
 }
 .b-status.passed-status {
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 .b-date-hint {
   display: block;
   font-size: 12px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -871,14 +874,14 @@ const onTouchEnd = (e) => {
   flex-shrink: 0;
   margin-left: 12px;
   font-size: 14px;
-  font-weight: 700;
-  color: #7C3AED;
+  font-weight: 600;
+  color: var(--secondary-color, #416F7B);
 }
 .b-days-right.today-days {
-  color: #635BFF;
+  color: var(--primary-color, #2F5D6B);
 }
 .b-days-right.passed-days {
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
   font-weight: 600;
 }
 
@@ -894,24 +897,24 @@ const onTouchEnd = (e) => {
   display: block;
   font-size: 15px;
   font-weight: 600;
-  color: #1F2937;
+  color: var(--text-ink, #1F2937);
   margin-bottom: 4px;
 }
 .detail-meta {
   font-size: 12px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 .remind-status {
   display: block;
   margin-top: 4px;
   font-size: 11px;
-  color: #A78BFA;
+  color: var(--secondary-color, #416F7B);
   font-weight: 600;
 }
 
 .remind-status-action {
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
 }
 
 .wechat-reauth-btn {
@@ -919,14 +922,14 @@ const onTouchEnd = (e) => {
   margin-top: 8px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: #ECFDF5;
-  border: 1px solid #A7F3D0;
+  background: var(--color-income-soft, #ECFDF5);
+  border: 1px solid var(--color-income-soft, #A7F3D0);
 }
 
 .wechat-reauth-btn-text {
   font-size: 11px;
-  font-weight: 700;
-  color: #059669;
+  font-weight: 600;
+  color: var(--color-income, #059669);
 }
 
 /* 空状态 */
@@ -945,13 +948,13 @@ const onTouchEnd = (e) => {
 }
 .empty-title {
   font-size: 15px;
-  font-weight: 700;
-  color: #1F2937;
+  font-weight: 600;
+  color: var(--text-ink, #1F2937);
   margin-bottom: 6px;
 }
 .empty-sub {
   font-size: 13px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
   text-align: center;
   line-height: 1.5;
 }
@@ -968,7 +971,7 @@ const onTouchEnd = (e) => {
 }
 .empty-inline text {
   font-size: 14px;
-  color: #94A3B8;
+  color: var(--text-muted, #94A3B8);
   font-weight: 500;
 }
 
@@ -979,3 +982,4 @@ const onTouchEnd = (e) => {
   to { opacity: 1; transform: translateY(0); }
 }
 </style>
+import AppIcon from '../common/AppIcon.vue';

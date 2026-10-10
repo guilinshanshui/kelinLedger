@@ -55,7 +55,7 @@ Roomie 是一个专为家庭和同住成员设计的协同生活小程序，提�
 - 存储：本地存储 + 云存储
 
 ### 换肤系统
-- 支持多种主题（默认、深色、自定义）
+- 支持两套主题（黛青、暖赭）
 - 颜色主题（主色调、辅助色、背景色）
 - 图片资源（图标、背景图）
 - 主题配置持久化
@@ -151,7 +151,7 @@ Roomie/
 - **框架**: uni-app x (Vue 3 + TypeScript)
 - **状态管理**: Pinia
 - **网络请求**: 自定义HTTP封装
-- **主题系统**: 自定义主题管理器
+- **主题系统**: 轻量 CSS 变量（common/themes/appTheme.ts + useAppTheme）
 - **UI组件**: 自定义组件库
 
 ### 项目结构
@@ -178,14 +178,13 @@ Roomie/
 - 错误处理机制
 
 #### 2. 主题系统 (`common/themes/`)
-- 主题管理器 (manager.ts)
-- 主题工具函数 (utils.ts)
-- 预设主题 (presets.ts)
-- 主题选择器组件 (ThemeSelector.uvue)
+- 主题预设 (appTheme.ts)
+- 主题 Hook (useAppTheme.js)
+- 页面主题混入 (pageThemeMixin.js)
+- 主题选择弹窗 (components/common/ThemePickerModal.vue)
 
 #### 3. 状态管理 (store/)
 - 用户状态管理 (user.ts)
-- 主题状态管理 (theme.ts)
 - 全局状态管理 (index.ts)
 
 #### 4. 页面框架
@@ -258,39 +257,11 @@ npm run build:mp-weixin
 
 ### 切换主题
 ```typescript
-import { switchTheme } from '@/common/themes'
+import { setAppThemeId } from '@/common/themes/appTheme'
 
-// 切换到指定主题
-switchTheme('dark') // 切换到深色主题
-switchTheme('fresh-green') // 切换到清新绿主题
+setAppThemeId('daiqing') // 黛青（默认）
+setAppThemeId('nuanzhe') // 暖赭
 ```
 
-### 创建自定义主题
-```typescript
-import { themeManager } from '@/common/themes'
-
-const customTheme = {
-  name: '我的主题',
-  primaryColor: '#FF6B35',
-  secondaryColor: '#FF8C42',
-  backgroundColor: '#FFF8F3',
-  textColor: '#2D3748',
-  cardBackground: '#FFFFFF',
-  borderColor: '#FED7CC'
-}
-
-themeManager.createCustomTheme(customTheme)
-```
-
-### 订阅主题变化
-```typescript
-import { subscribeTheme } from '@/common/themes'
-
-const unsubscribe = subscribeTheme((theme) => {
-  console.log('主题已切换:', theme.name)
-  // 处理主题变化逻辑
-})
-
-// 取消订阅
-unsubscribe()
-```
+主题只有两套，颜色值集中在 App.vue 的 CSS 变量与 common/themes/appTheme.ts 的预设表中；
+页面根节点通过 useAppTheme().themeClass 接收 theme-daiqing / theme-nuanzhe。

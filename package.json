@@ -1,22 +1,50 @@
 {
   "name": "roomie",
-  "version": "2.0.0",
-  "description": "Roomie - 家庭协同小程序",
-  "main": "main.uts",
+  "version": "2.1.7",
+  "description": "Roomie - 家庭协同小程序（微信云开发）",
+  "private": true,
+  "main": "main.js",
   "scripts": {
-    "dev:h5": "cross-env NODE_ENV=development UNI_PLATFORM=h5 vue-cli-service uni-serve",
-    "dev:mp-weixin": "cross-env NODE_ENV=development UNI_PLATFORM=mp-weixin vue-cli-service uni-build --watch",
-    "build:h5": "cross-env NODE_ENV=production UNI_PLATFORM=h5 vue-cli-service uni-build",
-    "build:mp-weixin": "cross-env NODE_ENV=production UNI_PLATFORM=mp-weixin vue-cli-service uni-build"
+    "dev:h5": "node scripts/uni-cli.js",
+    "dev:mp-weixin": "node scripts/uni-cli.js -p mp-weixin",
+    "build:h5": "node scripts/uni-cli.js build",
+    "build:mp-weixin": "node scripts/uni-cli.js build -p mp-weixin && node scripts/build-cloud-function.js",
+    "build:cloudfn": "node scripts/build-cloud-function.js",
+    "open:mp": "node scripts/open-devtools.js",
+    "verify:mp": "node scripts/verify-mp-build.js",
+    "icons:build": "node scripts/build-mingcute-icons.js",
+    "icons:verify": "node scripts/verify-mingcute-icons.js",
+    "audit": "node scripts/audit-project.js && node scripts/audit-buttons.js && node scripts/audit-contrast.js",
+    "audit:buttons": "node scripts/audit-buttons.js",
+    "audit:theme": "node scripts/audit-theme-hardcode.js",
+    "audit:contrast": "node scripts/audit-contrast.js",
+    "audit:inline": "node scripts/audit-inline-colors.js",
+    "audit:dead": "node scripts/audit-dead-code.js",
+    "audit:runtime": "node scripts/audit-runtime.js",
+    "audit:typography": "node scripts/audit-typography.js",
+    "theme:normalize": "node scripts/normalize-theme-colors.js",
+    "verify:theme": "node scripts/verify-theme-and-asset.js",
+    "test:cloud": "node scripts/smoke-cloud.js",
+    "ui:normalize": "node scripts/normalize-ui.js"
   },
   "dependencies": {
-    "pinia": "^2.1.7",
-    "vue": "^2.7.14"
+    "@dcloudio/uni-app": "3.0.0-alpha-5030120260930001",
+    "@dcloudio/uni-components": "3.0.0-alpha-5030120260930001",
+    "@dcloudio/uni-h5": "3.0.0-alpha-5030120260930001",
+    "@dcloudio/uni-mp-vue": "3.0.0-alpha-5030120260930001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-5030120260930001",
+    "pinia": "2.1.7",
+    "vue": "3.4.21"
   },
   "devDependencies": {
-    "@dcloudio/vue-cli-plugin-uni": "^2.0.2",
-    "@vue/cli-service": "^4.5.19",
-    "cross-env": "^7.0.3"
+    "@dcloudio/types": "3.4.31",
+    "@dcloudio/uni-automator": "3.0.0-alpha-5030120260930001",
+    "@dcloudio/uni-cli-shared": "3.0.0-alpha-5030120260930001",
+    "@dcloudio/uni-stacktracey": "3.0.0-alpha-5030120260930001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-5030120260930001",
+    "@resvg/resvg-js": "^2.6.2",
+    "miniprogram-automator": "^0.12.1",
+    "vite": "5.2.8"
   },
   "browserslist": [
     "Android >= 7",

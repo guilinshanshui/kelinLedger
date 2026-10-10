@@ -1,4 +1,9 @@
 {
+  "appid": "wx8ab87add7a9a0f11",
+  "projectname": "roomie",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "cloudfunctionRoot": "cloudfunctions/",
   "setting": {
     "ignoreDevUnusedFiles": false,
     "ignoreUploadUnusedFiles": false

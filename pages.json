@@ -4,153 +4,31 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "index",
+				"navigationBarTitleText": "可林记账本",
 				"navigationStyle": "custom"
 			}
 		},
-		 {
-		      "path": "pages/game-scorer/lobby",
-		      "style": {
-		        "navigationBarTitleText": "游戏大厅",
-		        "navigationStyle": "custom",
-		        "disableScroll": true
-		      }
-		    },
-		    {
-		      "path": "pages/game-scorer/room",
-		      "style": {
-		        "navigationBarTitleText": "计分房间",
-		        "navigationStyle": "custom",
-		        "disableScroll": true
-		      }
-		    },
-		// room创建
+		 // room创建
 		{
 			"path": "pages/create-room/create-room",
 			"style": {
-				"navigationBarTitleText": "Roomie",
+				"navigationBarTitleText": "可林记账本",
 				"navigationStyle": "custom",
-				"backgroundColor": "#EEF2FF"
+				"backgroundColor": "#E9F0F2"
 			}
 		},
 		{
-			"path": "pages/lucky-wheel/slot-machine",
-			"style": {
-				"navigationBarTitleText": "老虎机",
-				"navigationStyle": "custom",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/copy-generator/copy-generator",
-			"style": {
-				"navigationBarTitleText": "老虎机",
-				"navigationStyle": "custom",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/emoji-search/emoji-search",
-			"style": {
-				"navigationBarTitleText": "表情搜索",
-				"navigationStyle": "custom",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		 {
-		      "path": "pages/wallpaper-gallery/wallpaper-gallery",
-		      "style": {
-		        "navigationBarTitleText": "壁纸画廊",
-		        "navigationStyle": "custom",
-		        "disableScroll": true
-		      }
-		    },
-		{
-		      "path": "pages/lucky-wheel/finger-chooser",
-		      "style": {
-		        "navigationBarTitleText": "指尖选择",
-		        "navigationStyle": "custom",
-		        "disableScroll": true
-		      }
-		    },
-			{
-			      "path": "pages/lucky-wheel/dice",
+			      "path": "pages/report/bill-calendar",
 			      "style": {
-			        "navigationBarTitleText": "摇骰子",
+			        "navigationBarTitleText": "账单日历",
 			        "navigationStyle": "custom",
 			        "disableScroll": true
 			      }
 			    },
-			{
-			      "path": "pages/lucky-wheel/card-flip",
-			      "style": {
-			        "navigationBarTitleText": "幸运翻牌",
-			        "navigationStyle": "custom",
-			        "disableScroll": true
-			      }
-			    },
-			{
-			      "path": "pages/report/monthly-report",
-			      "style": {
-			        "navigationBarTitleText": "月度账单",
-			        "navigationStyle": "custom",
-			        "disableScroll": true
-			      }
-			    },
-		    {
-		      "path": "pages/lucky-wheel/numeric-bomb",
-		      "style": {
-		        "navigationBarTitleText": "数字炸弹",
-		        "navigationStyle": "custom"
-		      }
-		    },
-			 {
-			      "path": "pages/report/weekly-report",
-			      "style": {
-			        "navigationBarTitleText": "本周回顾",
-			        "navigationStyle": "custom",
-			        "disableScroll": true
-			      }
-			    },
-		{
-		      "path": "pages/lucky-wheel/customize-wheel",
-		      "style": {
-		        "navigationBarTitleText": "管理选项",
-		        "navigationStyle": "custom"
-		      }
-		    },
-		{
-		      "path": "pages/share-poster/share-poster",
-		      "style": {
-		        "navigationBarTitleText": "分享空间状态",
-		        "navigationStyle": "custom"
-		      }
-		    },{
-		      "path": "pages/order/order",
-		      "style": {
-		        "navigationBarTitleText": "订单",
-		        "navigationStyle": "custom"
-		      }
-		    },
-		 {
-		      "path": "pages/lucky-wheel/lucky-wheel",
-		      "style": {
-		        "navigationBarTitleText": "决策轮盘",
-		        "navigationStyle": "custom"
-		      }
-		    },
 		{
 		      "path": "pages/member-management/member-management",
 		      "style": {
 		        "navigationBarTitleText": "成员权限管理",
-		        "navigationStyle": "custom"
-		      }
-		    },
-		//个人资料
-		{
-		      "path": "pages/profile-settings/profile-settings",
-		      "style": {
-		        "navigationBarTitleText": "个人资料",
 		        "navigationStyle": "custom"
 		      }
 		    },
@@ -161,16 +39,7 @@
 			        "navigationStyle": "custom"
 			      }
 			    },
-		// 启动页
-		{
-			"path": "pages/splash/splash",
-			"style": {
-				"navigationBarTitleText": "Roomie",
-				"navigationStyle": "custom",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		 {
+{
 		      "path": "pages/ledger-all/ledger-all",
 		      "style": {
 		        "navigationBarTitleText": "收支流水",
@@ -221,7 +90,15 @@
 		{
 			"path": "pages/room-list/room-list",
 			"style": {
-				"navigationBarTitleText": "详情",
+				"navigationBarTitleText": "账本管理",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"backgroundColor": "#F6F8F8"
+			}
+		},
+		{
+			"path": "pages/room-settings/room-settings",
+			"style": {
+				"navigationBarTitleText": "账本设置",
 				"navigationStyle": "custom"
 			}
 		},
@@ -233,22 +110,13 @@
 				"navigationStyle": "custom"
 			}
 		},
-		// 同屋选择页
-		{
-			"path": "pages/room-select/room-select",
-			"style": {
-				"navigationBarTitleText": "选择同屋",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
 		// 主页（底部Tab）
 		{
 			"path": "pages/home/home",
 			"style": {
 				"navigationBarTitleText": "首页",
 				"navigationBarBackgroundColor": "#FFFFFF",
-				"backgroundColor": "#F5F5F5"
+				"backgroundColor": "#F6F8F8"
 			}
 		},
 		{
@@ -271,7 +139,7 @@
 			"style": {
 				"navigationBarTitleText": "我的",
 				"navigationBarBackgroundColor": "#FFFFFF",
-				"backgroundColor": "#F5F5F5"
+				"backgroundColor": "#F6F8F8"
 			}
 		}
 	],
@@ -279,11 +147,38 @@
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "",
 		"navigationBarBackgroundColor": "#FFFFFF",
-		"backgroundColor": "#F5F5F5",
-		"backgroundColorBottom": "#F5F5F5",
+		"backgroundColor": "#F6F8F8",
+		"backgroundColorBottom": "#F6F8F8",
 		"app-plus": {
-			"background": "#F5F5F5"
+			"background": "#F6F8F8"
 		}
+	},
+	// 底部导航：账本 / 明细 / 我的（图标复用 static/tabbar 现有素材）
+	"tabBar": {
+		"color": "#94A3B8",
+		"selectedColor": "#2F5D6B",
+		"backgroundColor": "#FFFFFF",
+		"borderStyle": "white",
+		"list": [
+			{
+				"pagePath": "pages/room-list/room-list",
+				"text": "账本",
+				"iconPath": "static/tabbar/tn-tabbar0.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar0-cur-daiqing.png"
+			},
+			{
+				"pagePath": "pages/home/home",
+				"text": "明细",
+				"iconPath": "static/tabbar/tn-tabbar2.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar2-cur-daiqing.png"
+			},
+			{
+				"pagePath": "pages/profile/profile",
+				"text": "我的",
+				"iconPath": "static/tabbar/tn-tabbar3.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar3-cur-daiqing.png"
+			}
+		]
 	},
 	"uniIdRouter": {}
 }

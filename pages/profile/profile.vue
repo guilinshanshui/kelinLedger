@@ -1,22 +1,15 @@
 <template>
   <view :class="themeClass" class="profile-root">
-    <!-- 1. 极致纯净的背景氛围 -->
-    <view class="nebula-canvas">
-      <view class="whisper-orb orb-primary"></view>
-      <view class="whisper-orb orb-secondary"></view>
-      <view class="noise-grain"></view>
-    </view>
-
     <scroll-view scroll-y class="profile-scroll" :show-scrollbar="false">
       <!-- 2. 用户核心区 (入场动画 1) -->
       <view class="hero-zone animate-in" style="--delay: 0.1s" @click="!isLoggedIn && goToLogin()">
         <view class="user-display-box">
           <view class="avatar-wrap">
-            <view class="avatar-glow-ring" :class="{ 'is-guest': !isLoggedIn }"></view>
-            <image 
-              :src="isLoggedIn ? user.userHeadUrl : 'https://i.pravatar.cc/100?u=guest_family'" 
-              class="user-main-avt" 
-              :class="{ 'guest-filter': !isLoggedIn }"
+            <UserAvatar
+              :src="isLoggedIn ? user.userHeadUrl : ''"
+              :name="isLoggedIn ? user.userNickname : '未登录'"
+              :size="72"
+              radius="16px"
             />
           </view>
           
@@ -25,30 +18,28 @@
               <text class="user-nick">{{ isLoggedIn ? user.userNickname : '点击登录空间' }}</text>
               <!-- <view v-if="isLoggedIn" class="pro-badge">PRO</view> -->
             </view>
-            <view class="status-pill">
-              <view class="status-dot-mini" :class="{ 'offline': !isLoggedIn }"></view>
-              <text class="status-txt">{{ isLoggedIn ? '安全协作中' : '离线状态' }}</text>
-            </view>
           </view>
         </view>
+
+      </view>
 
         <!-- 3. 极简横向数据面板 (入场动画 2) -->
         <view class="flat-dashboard animate-in" style="--delay: 0.2s" :class="{ 'is-locked': !isLoggedIn }">
           <view class="dashboard-inner">
-            <view class="dash-item">
-              <text class="dash-val">{{ isLoggedIn && userStatsInfo ? userStatsInfo.active_days : '--' }}</text>
-              <text class="dash-label">活跃天数</text>
+            <view class="dash-item" @click="dashClick('ledger')">
+              <text class="dash-val">{{ isLoggedIn && userStatsInfo ? userStatsInfo.ledgerCount : '--' }}</text>
+              <text class="dash-label">本月记账</text>
             </view>
             <view class="dash-divider"></view>
-            <view class="dash-item">
-              <text class="dash-val">{{ isLoggedIn && userStatsInfo ? userStatsInfo.room_count : '--' }}</text>
-              <text class="dash-label">协作空间</text>
+            <view class="dash-item" @click="dashClick('room')">
+              <text class="dash-val">{{ isLoggedIn && userStatsInfo ? userStatsInfo.roomCount : '--' }}</text>
+              <text class="dash-label">温馨小窝</text>
             </view>
             <view class="dash-divider"></view>
-            <view class="dash-item highlight">
+            <view class="dash-item highlight" @click="dashClick('asset')">
               <view class="price-row">
                 <text class="currency">¥</text>
-                <text class="dash-val">{{ isLoggedIn && userStatsInfo ? userStatsInfo.month_ledger_total : '0' }}</text>
+                <text class="dash-val">{{ isLoggedIn && userStatsInfo ? formatPrice(userStatsInfo.totalExpense) : '0' }}</text>
               </view>
               <text class="dash-label">本月支出</text>
             </view>
@@ -57,12 +48,11 @@
           <!-- 锁定态遮罩 -->
           <view v-if="!isLoggedIn" class="dash-lock-layer">
             <view class="lock-pill">
-              <text class="lock-emoji">🔒</text>
+              <AppIcon name="lock" :size="14" />
               <text class="lock-txt">登录同步数据</text>
             </view>
           </view>
         </view>
-      </view>
 
       <!-- 4. 菜单矩阵 (入场动画 3) -->
       <view class="menu-container animate-in" style="--delay: 0.3s">
@@ -71,10 +61,22 @@
         </view>
         
         <view class="flat-menu-list">
-          <view class="menu-item" hover-class="menu-hover" @click="handleMenuClick('member')">
+          <view id="menu-profile" class="menu-item" hover-class="menu-hover" @click="openProfileEditor">
             <view class="item-l">
-              <view class="item-icon-box bg-indigo">
-                <text class="icon-e">🔐️</text>
+              <view class="item-icon-box">
+                <AppIcon name="user-2" :size="20" />
+              </view>
+              <text class="item-name">编辑资料</text>
+            </view>
+            <view class="item-r">
+              <text class="item-arrow">›</text>
+            </view>
+          </view>
+
+          <view id="menu-member" class="menu-item" hover-class="menu-hover" @click="handleMenuClick('member')">
+            <view class="item-l">
+              <view class="item-icon-box">
+                <AppIcon name="safe-shield" :size="20" />
               </view>
               <text class="item-name">空间权限管理</text>
             </view>
@@ -83,10 +85,27 @@
             </view>
           </view>
 
-          <view class="menu-item" hover-class="menu-hover" @click="openThemePicker">
+          <!--
+            空间看板：账本 / 清单 / 日程 / 动态四个模块的入口页。
+            之前它只能从「消息中心」某条日程提醒点进去，界面上没有常驻入口，
+            导致放在它里面的清单中心一直找不到。
+          -->
+          <view id="menu-dashboard" class="menu-item" hover-class="menu-hover" @click="goToDashboard">
             <view class="item-l">
-              <view class="item-icon-box bg-theme-soft">
-                <text class="icon-e">🎨</text>
+              <view class="item-icon-box">
+                <AppIcon name="counter-2" :size="20" />
+              </view>
+              <text class="item-name">空间看板</text>
+            </view>
+            <view class="item-r">
+              <text class="item-arrow">›</text>
+            </view>
+          </view>
+
+          <view id="menu-theme" class="menu-item" hover-class="menu-hover" @click="openThemePicker">
+            <view class="item-l">
+              <view class="item-icon-box">
+                <AppIcon name="palette-2" :size="20" />
               </view>
               <text class="item-name">个性换肤</text>
             </view>
@@ -96,10 +115,46 @@
             </view>
           </view>
 
-          <view class="menu-item" hover-class="menu-hover" @click="goToVersionHistory">
+          <view id="menu-asset" class="menu-item" hover-class="menu-hover" @click="goToAsset">
             <view class="item-l">
-              <view class="item-icon-box bg-blue">
-                <text class="icon-e">🔔</text>
+              <view class="item-icon-box">
+                <AppIcon name="bank-card" :size="20" />
+              </view>
+              <text class="item-name">资产账户</text>
+            </view>
+            <view class="item-r">
+              <text class="item-arrow">›</text>
+            </view>
+          </view>
+
+          <view id="menu-import" class="menu-item" hover-class="menu-hover" @click="goToImport">
+            <view class="item-l">
+              <view class="item-icon-box">
+                <AppIcon name="download-2" :size="20" />
+              </view>
+              <text class="item-name">导入账单</text>
+            </view>
+            <view class="item-r">
+              <text class="item-arrow">›</text>
+            </view>
+          </view>
+
+          <view id="menu-export" class="menu-item" hover-class="menu-hover" @click="handleExport">
+            <view class="item-l">
+              <view class="item-icon-box">
+                <AppIcon name="file-upload" :size="20" />
+              </view>
+              <text class="item-name">导出账单</text>
+            </view>
+            <view class="item-r">
+              <text class="item-arrow">›</text>
+            </view>
+          </view>
+
+          <view id="menu-version" class="menu-item" hover-class="menu-hover" @click="goToVersionHistory">
+            <view class="item-l">
+              <view class="item-icon-box">
+                <AppIcon name="notification" :size="20" />
               </view>
               <text class="item-name">更新日志</text>
             </view>
@@ -108,19 +163,6 @@
               <text class="item-arrow">›</text>
             </view>
           </view>
-		  
-		  <view v-if="false" class="menu-item" hover-class="menu-hover" @click="goToLucky">
-		    <view class="item-l">
-		      <view class="item-icon-box bg-blue">
-		        <text class="icon-e">🎡</text>
-		      </view>
-		      <text class="item-name">灵感决策盘</text>
-		    </view>
-		    <view class="item-r">
-		      <!-- <text class="item-val">v1.0.0</text> -->
-		      <text class="item-arrow">›</text>
-		    </view>
-		  </view>
         </view>
 
         <!-- 5. 增强版退出按钮 (入场动画 4) -->
@@ -128,10 +170,8 @@
           <block v-if="isLoggedIn">
             <view class="logout-action-box" @click="handleLogout">
               <view class="logout-btn-premium">
-                <!-- <text class="logout-icon">🚪</text> -->
                 <text class="logout-text">退出当前账号</text>
               </view>
-              <view class="btn-shadow"></view>
             </view>
             <!-- <text class="sec-tip">数据已通过云端加密保护</text> -->
           </block>
@@ -139,7 +179,6 @@
           <block v-else>
             <button class="login-action-btn" @click="goToLogin">
               <text class="login-btn-txt">立即开启协作</text>
-              <view class="btn-shine"></view>
             </button>
             <!-- <text class="sec-tip">已有 2,400+ 家庭正在使用</text> -->
           </block>
@@ -149,51 +188,120 @@
       <view class="bottom-safe-fill"></view>
     </scroll-view>
 
+    <ProfileEditModal
+      v-if="isLoggedIn"
+      v-model="showProfileEditor"
+      :isEdit="true"
+      :userInfo="profileEditorInfo"
+      @complete="onProfileSaved"
+    />
+
+    <ThemePickerModal v-model="showThemePicker" />
+
   </view>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { userApi } from '../../common/api';
-import dataJson from '/data.json';
-import {goToLogin} from '../js/utils.js';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { userApi, assetApi } from '../../common/api';
+import { STORAGE_KEYS } from '../../common/config';
+import { normalizeUser } from '@/common/utils/session';
+import { formatPrice, goToLogin } from '../js/utils.js';
+import { onShow } from '@dcloudio/uni-app';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
 import { formatAppVersion } from '@/common/config';
+import { useUserStore } from '@/store/user';
+import UserAvatar from '../../components/common/UserAvatar.vue';
+import AppIcon from '../../components/common/AppIcon.vue';
+import ProfileEditModal from '../../components/common/ProfileEditModal.vue';
+import ThemePickerModal from '../../components/common/ThemePickerModal.vue';
 
-const { theme } = useAppTheme();
+const { theme, themeClass } = useAppTheme();
+const userStore = useUserStore();
 const appVersionLabel = formatAppVersion();
 
 const isLoggedIn = ref(false);
 const isStatsLoading = ref(false);
-const user = ref({ userNickname: '', userHeadUrl: '' });
+const user = ref(normalizeUser(null));
 const userStatsInfo = ref(null);
+const showProfileEditor = ref(false);
+const showThemePicker = ref(false);
+const profileEditorInfo = computed(() => ({
+  nickname: user.value.userNickname || '',
+  avatar: user.value.userHeadUrl || ''
+}));
+
+const openProfileEditor = () => {
+  if (!isLoggedIn.value) {
+    goToLogin();
+    return;
+  }
+  showProfileEditor.value = true;
+};
+
+const onProfileSaved = (saved) => {
+  user.value = normalizeUser({
+    ...user.value,
+    nickname: (saved && saved.nickname) || user.value.nickname,
+    avatar: (saved && saved.avatar) || user.value.avatar
+  });
+};
+
+/**
+ * 「我的」是 tab 页，onMounted 只会跑一次。
+ * 如果只在 mounted 里拉统计，切了账本再回来看到的还是上一个账本的数字。
+ * 所以每次 onShow 都重新按当前账本取一次。
+ */
+onShow(() => {
+  if (isLoggedIn.value) getUserStatsInfo();
+});
+
+/**
+ * 登录 / 登出广播的处理函数。
+ * 写成 setup 作用域的具名函数：注销时只摘自己这一个监听，
+ * 用 uni.$off('user_login') 会连首页注册的同一事件一起摘掉。
+ */
+const onUserLogin = (data) => {
+  if (data) {
+    isLoggedIn.value = true;
+    const next = userStore.currentUser || uni.getStorageSync(STORAGE_KEYS.USER_INFO) || {};
+    user.value = normalizeUser(next);
+    getUserStatsInfo();
+  } else {
+    isLoggedIn.value = false;
+    userStatsInfo.value = null;
+  }
+};
 
 onMounted(() => {
-  const savedUser = uni.getStorageSync('userInfo');
+  const savedUser = userStore.currentUser || uni.getStorageSync(STORAGE_KEYS.USER_INFO);
   if (savedUser) {
     isLoggedIn.value = true;
-    user.value = savedUser;
+    user.value = normalizeUser(savedUser);
     getUserStatsInfo();
   }
   
-  uni.$on('user_login', (data) => {
-    if(data){
-      isLoggedIn.value = true;
-	  console.log(data);
-      user.value = uni.getStorageSync('userInfo');;
-      getUserStatsInfo();
-    } else {
-      isLoggedIn.value = false;
-      userStatsInfo.value = null;
-    }
-  });
+  uni.$on('user_login', onUserLogin);
+});
+
+// 「我的」是常驻 tab 页，但页面仍可能被系统回收后重建；不注销的话每次重建都会多注册一次
+onUnmounted(() => {
+  uni.$off('user_login', onUserLogin);
 });
 
 const getUserStatsInfo = async () => {
   if (!isLoggedIn.value) return;
   isStatsLoading.value = true;
   try {
-    const res = await userApi.getUserStatsInfo();
+    // 只统计当前房间，避免把其他空间的账单算进来
+    let statsRoomId = "";
+    try {
+      const saved = uni.getStorageSync(STORAGE_KEYS.CURRENT_ROOM);
+      statsRoomId = (saved && saved.id) || "";
+    } catch (e) {
+      statsRoomId = "";
+    }
+    const res = await userApi.getUserStatsInfo(statsRoomId ? { roomId: statsRoomId } : {});
     if (res && res.code === 0) {
       userStatsInfo.value = res.data;
     }
@@ -209,8 +317,7 @@ const getUserStatsInfo = async () => {
 
 const handleMenuClick = (type) => {
   if ( !goToLogin()) { return; }
-  console.log(userStatsInfo.value.room_count );
-  if((userStatsInfo.value.room_count)<=0){
+  if (((userStatsInfo.value && userStatsInfo.value.roomCount) || 0) <= 0) {
 	  uni.showToast({
 	  	title:'暂无空间',
 		icon:'none'
@@ -220,14 +327,119 @@ const handleMenuClick = (type) => {
   if (type === 'member') uni.navigateTo({ url: '/pages/member-management/member-management' });
 };
 const openThemePicker = () => {
-  uni.$emit('open_theme_picker');
+  showThemePicker.value = true;
 };
 
 const goToVersionHistory = () => uni.navigateTo({ url: '/pages/version-history/version-history' }); //
-const goToLucky = () =>{
-	 // if ( !goToLogin()) { return; }
-	  uni.navigateTo({ url: '/pages/game-scorer/lobby' });
-}
+
+/** 当前账本（由「账本」Tab 写入本地缓存） */
+const currentRoomId = () => {
+  try {
+    const saved = uni.getStorageSync(STORAGE_KEYS.CURRENT_ROOM);
+    return (saved && saved.id) || '';
+  } catch (error) {
+    return '';
+  }
+};
+
+const requireRoom = () => {
+  const roomId = currentRoomId();
+  if (!roomId) uni.showToast({ title: '请先在「账本」中选择一个账本', icon: 'none' });
+  return roomId;
+};
+
+/**
+ * 统计卡片点击跳转，三个数字都能点：
+ * - 本月记账 → 收支流水，并且直接落在「本月」（和卡片数字同一口径）
+ * - 温馨小窝 → 账本列表
+ * - 本月支出 → 资产账户，并且直接落在「本月」
+ *
+ * home / room-list / profile 是 tabBar 页面，只能用 switchTab；
+ * 之前这里用 navigateTo 打开 home，小程序会直接报错不跳转。
+ */
+const dashClick = (type) => {
+  if (!isLoggedIn.value) { goToLogin(); return; }
+  if (type === 'ledger') {
+    const roomId = requireRoom();
+    if (!roomId) return;
+    uni.navigateTo({ url: `/pages/ledger-all/ledger-all?roomId=${roomId}&period=month` });
+  } else if (type === 'room') {
+    uni.switchTab({ url: '/pages/room-list/room-list' });
+  } else if (type === 'asset') {
+    goToAsset();
+  }
+};
+
+/** 空间看板：房间的四个功能模块（账本/清单/日程/动态）都从这里进 */
+const goToDashboard = () => {
+  const roomId = requireRoom();
+  if (!roomId) return;
+  uni.navigateTo({ url: `/pages/dashboard/dashboard?roomId=${roomId}` });
+};
+
+const goToAsset = () => {
+  const roomId = requireRoom();
+  if (!roomId) return;
+  // range=month：卡片上的金额是本月支出，进去也应该是本月
+  uni.navigateTo({ url: `/pages/asset-details/asset-details?roomId=${roomId}&range=month` });
+};
+
+const goToImport = () => {
+  const roomId = requireRoom();
+  if (!roomId) return;
+  uni.navigateTo({ url: `/pages/ledger-import/ledger-import?roomId=${roomId}` });
+};
+
+/** 导出账单：云函数生成 CSV，写入本地后调起分享 */
+const handleExport = async () => {
+  const roomId = requireRoom();
+  if (!roomId) return;
+
+  uni.showLoading({ title: '正在生成…', mask: true });
+  try {
+    const res = await assetApi.exportLedger({ roomId });
+    uni.hideLoading();
+
+    if (res.code !== 0) {
+      uni.showToast({ title: res.message || '导出失败', icon: 'none' });
+      return;
+    }
+    const payload = res.data || {};
+    if (!payload.count) {
+      uni.showToast({ title: '该账本还没有账单', icon: 'none' });
+      return;
+    }
+
+    // USER_DATA_PATH 仅微信端提供，其他平台降级为提示
+    const userDataPath = typeof wx !== 'undefined' && wx.env ? wx.env.USER_DATA_PATH : '';
+    if (!userDataPath) {
+      uni.showToast({ title: `已生成 ${payload.count} 条记录`, icon: 'success' });
+      return;
+    }
+
+    const filePath = `${userDataPath}/${payload.filename}`;
+    uni.getFileSystemManager().writeFile({
+      filePath,
+      data: payload.content,
+      encoding: 'utf8',
+      success: () => {
+        if (typeof uni.shareFileMessage === 'function') {
+          uni.shareFileMessage({
+            filePath,
+            fileName: payload.filename,
+            fail: () => uni.showToast({ title: `已导出 ${payload.count} 条`, icon: 'success' })
+          });
+        } else {
+          uni.showToast({ title: `已导出 ${payload.count} 条`, icon: 'success' });
+        }
+      },
+      fail: () => uni.showToast({ title: '写入文件失败', icon: 'none' })
+    });
+  } catch (error) {
+    uni.hideLoading();
+    uni.showToast({ title: '导出失败', icon: 'none' });
+  }
+};
 
 
 const handleLogout = () => {
@@ -235,16 +447,16 @@ const handleLogout = () => {
     title: '确认登出',
     content: '登出后您将无法实时同步家庭数据',
     confirmText: '确认退出',
-    confirmColor: '#F43F5E',
-    cancelColor: '#94A3B8',
+    // 原生弹窗只吃具体色值，这里取当前主题的两个色，避免切肤后还闪着旧红
+    confirmColor: theme.value.expense,
+    cancelColor: theme.value.textSub,
     success: (res) => {
       if (res.confirm) {
-        uni.removeStorageSync('userInfo');
-		dataJson.userInfo=null;
-		dataJson.isLogin=false;
+        userStore.logout();
+        userStore.setCurrentRoom(null);
         isLoggedIn.value = false;
         userStatsInfo.value = null;
-		    uni.$emit('user_login', false)
+        uni.$emit('user_login', false)
         goToLogin();
       }
     }
@@ -256,212 +468,142 @@ const handleLogout = () => {
 .profile-root {
   position: fixed;
   inset: 0;
-  background: var(--primary-soft, #FFFFFF);
+  background: var(--bg-page, #F6F8F8);
   overflow: hidden;
   transition: background-color 0.35s ease;
 }
 
-/* 背景设计：极致轻量 */
-.nebula-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
-.whisper-orb { 
-  position: absolute; border-radius: 50%; 
-  filter: blur(100px); opacity: 0.12;
-  animation: dynamicFlow 25s infinite alternate ease-in-out;
-}
-.orb-primary {
-  top: -5%;
-  right: -5%;
-  width: 450px;
-  height: 450px;
-  background: var(--primary-color, #4F46E5);
-  transition: background 0.35s ease;
-}
-.orb-secondary {
-  bottom: 10%;
-  left: -10%;
-  width: 400px;
-  height: 400px;
-  background: var(--secondary-color, #0EA5E9);
-  animation-delay: -5s;
-  transition: background 0.35s ease;
-}
-@keyframes dynamicFlow { 0% { transform: scale(1) translate(0, 0); } 100% { transform: scale(1.1) translate(20px, 30px); } }
-.noise-grain { position: absolute; inset: 0; opacity: 0.02; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 
 .profile-scroll { position: relative; z-index: 1; height: 100%; }
 
 /* Hero Zone */
-.hero-zone { padding: 80px 28px 30px; }
-.user-display-box { display: flex; align-items: center; gap: 20px; margin-bottom: 40px; }
+.hero-zone {
+  padding: 16px 16px 42px;
+  background: var(--primary-color, #2F5D6B);
+}
+.user-display-box { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
 
 .avatar-wrap { position: relative; width: 72px; height: 72px; }
-.avatar-glow-ring {
-  position: absolute;
-  inset: -3px;
-  background: linear-gradient(135deg, var(--primary-color, #4F46E5), var(--secondary-color, #0EA5E9));
-  border-radius: 26px;
-  filter: blur(4px);
-  opacity: 0.2;
-  transition: background 0.35s ease;
-}
-.avatar-glow-ring.is-guest {
-  background: var(--primary-soft, #eef2ff);
-  opacity: 1;
-  box-shadow: 0 0 0 1px var(--primary-glow, rgba(79, 70, 229, 0.15));
-}
 
-.user-main-avt { 
-  position: relative; width: 100%; height: 100%; border-radius: 22px; 
-  background: #F1F5F9; border: 2px solid #fff;
-}
-.guest-filter { filter: grayscale(1); opacity: 0.5; }
 
 .user-meta-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .name-row { display: flex; align-items: center; gap: 8px; }
-.user-nick { font-size: 24px; font-weight: 900; color: #1E293B; letter-spacing: -0.5px; }
+  .user-nick { font-size: 22px; font-weight: 600; color: #FFFFFF; letter-spacing: 0; }
 .pro-badge {
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   color: #fff;
   font-size: 9px;
-  font-weight: 900;
+  font-weight: 600;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm, 8px);
 }
 
-.status-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  padding: 4px 10px;
-  background: var(--primary-soft, #eef2ff);
-  border-radius: 100px;
-  transition: background 0.35s ease;
-}
-.status-dot-mini { width: 5px; height: 5px; background: #10b981; border-radius: 50%; }
-.status-dot-mini.offline {
-  background: var(--primary-color, #4f46e5);
-  opacity: 0.45;
-}
-.status-txt { font-size: 10px; font-weight: 800; color: #64748b; }
-.status-dot-mini.offline + .status-txt {
-  color: var(--primary-color, #4f46e5);
-  opacity: 0.85;
-}
 
 /* Flat Dashboard */
 .flat-dashboard { 
-  background: rgba(255, 255, 255, 0.7); border-radius: 30px; 
-  border: 1px solid rgba(241, 245, 249, 0.8);
+  margin: -30px 16px 0;
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--line-hairline, #E8EEEF);
+  border-radius: var(--radius-md, 12px);
   position: relative; overflow: hidden;
 }
-.dashboard-inner { padding: 24px 0; display: flex; align-items: center; }
+.dashboard-inner { padding: 16px 0; display: flex; align-items: center; }
 .dash-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.dash-divider { width: 1px; height: 32px; background: #F1F5F9; }
-.dash-val { font-size: 22px; font-weight: 900; color: #1E293B; }
-.dash-label { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; }
-.highlight .dash-val { color: var(--primary-color, #4F46E5); }
+.dash-divider { width: 1px; height: 30px; background: var(--line-hairline, #E8EEEF); }
+.dash-val { font-size: 21px; font-weight: 600; color: var(--text-ink, #1E293B); font-variant-numeric: tabular-nums; }
+.dash-label { font-size: 12px; color: var(--text-sub, #64748B); }
+.highlight .dash-val { color: var(--primary-color, #2F5D6B); }
 .price-row { display: flex; align-items: baseline; gap: 2px; }
-.currency { font-size: 12px; font-weight: 900; color: var(--primary-color, #4F46E5); }
-.bg-theme-soft { background: var(--primary-soft, #EEF2FF); }
+.currency { font-size: 13px; font-weight: 600; color: var(--primary-color, #2F5D6B); }
 
 .dash-lock-layer { 
-  position: absolute; inset: 0; background: rgba(255,255,255,0.4);
-  backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 0; background: rgba(255,255,255,0.72); display: flex; align-items: center; justify-content: center;
 }
 .lock-pill {
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   padding: 10px 20px;
-  border-radius: 100px;
+  border-radius: var(--radius-pill, 999px);
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 8px 22px var(--primary-glow, rgba(79, 70, 229, 0.28));
+  box-shadow: 0 8px 22px var(--primary-glow, rgba(47, 93, 107, 0.28));
   transition: background 0.35s ease, box-shadow 0.35s ease;
 }
 .lock-emoji { font-size: 14px; }
-.lock-txt { color: #fff; font-size: 12px; font-weight: 900; }
+.lock-txt { color: #fff; font-size: 12px; font-weight: 600; }
 
 /* Menu Container */
-.menu-container { padding: 30px 28px 60px; }
-.group-header { margin-bottom: 16px; padding-left: 10px; }
-.group-title { font-size: 12px; font-weight: 900; color: #CBD5E1; text-transform: uppercase; letter-spacing: 2px; }
+.menu-container { padding: 20px 16px 20px; }
+.group-header { margin-bottom: 10px; }
+.group-title { font-size: 12px; font-weight: 600; color: var(--text-sub, #64748B); }
 
 .flat-menu-list { 
-  background: #FFFFFF; border-radius: 28px; border: 1px solid #F1F5F9; overflow: hidden;
+  background: var(--bg-card, #FFFFFF); border-radius: var(--radius-md, 12px); border: 1px solid var(--line-hairline, #EEF1F5); overflow: hidden;
 }
 .menu-item { 
-  height: 72px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid #F8FAFC; transition: all 0.2s;
+  height: 48px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--line-soft, #F7F9FC); transition: background-color 0.2s ease;
 }
 .menu-item:last-child { border-bottom: none; }
 .menu-hover { background: #F8FAFC; }
 
 .item-l { display: flex; align-items: center; gap: 16px; }
 .item-icon-box { 
-  width: 42px; height: 42px; border-radius: 14px; 
+  width: 36px; height: 36px; border-radius: var(--radius-sm, 8px);
   display: flex; align-items: center; justify-content: center;
+  background: var(--primary-soft, #E9F0F2);
 }
-.bg-indigo { background: var(--primary-soft, #EEF2FF); }
-.bg-blue { background: #F0F9FF; }
 .icon-e { font-size: 18px; }
-.item-name { font-size: 15px; font-weight: 800; color: #334155; }
+.item-name { font-size: 15px; font-weight: 600; color: var(--text-ink, #334155); }
 
 .item-r { display: flex; align-items: center; gap: 8px; }
-.item-val { font-size: 12px; font-weight: 700; color: #CBD5E1; }
+.item-val { font-size: 12px; font-weight: 600; color: var(--text-faint, #CBD5E1); }
 .theme-name-val {
-  color: var(--primary-color, #4f46e5);
-  font-weight: 800;
+  color: var(--primary-color, #2f5d6b);
+  font-weight: 600;
   transition: color 0.35s ease;
 }
-.item-arrow { font-size: 22px; color: #E2E8F0; line-height: 1; margin-top: -3px; }
+.item-arrow { font-size: 22px; color: var(--line-hairline, #E2E8F0); line-height: 1; margin-top: -3px; }
 
 /* Auth Zone */
-.auth-zone { margin-top: 40px; text-align: center; }
-.sec-tip { font-size: 11px; font-weight: 700; color: #CBD5E1; display: block; margin-top: 16px; }
+.auth-zone { margin-top: 24px; text-align: center; }
+.sec-tip { font-size: 11px; font-weight: 600; color: var(--text-faint, #CBD5E1); display: block; margin-top: 16px; }
 
 /* 退出登录按钮 */
 .logout-action-box { position: relative; width: 100%; display: flex; justify-content: center; }
 .logout-btn-premium {
-  width: 100%;
-  height: 68px;
-  background: var(--primary-soft, #eef2ff);
-  border: 1.5px solid var(--primary-color, #4f46e5);
-  border-radius: 22px;
+  min-width: 168px;
+  height: 40px;
+  padding: 0 26px;
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--line-hairline, #E8EEEF);
+  border-radius: var(--radius-pill, 999px);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  transition: transform 0.25s ease, background-color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-  z-index: 2;
-  box-shadow: 0 6px 20px var(--primary-glow, rgba(79, 70, 229, 0.08));
+  transition: background-color 0.2s ease;
 }
 .logout-btn-premium:active {
-  transform: scale(0.96);
-  box-shadow: 0 4px 14px var(--primary-glow, rgba(79, 70, 229, 0.12));
-  opacity: 0.92;
+  background: var(--bg-page, #F6F8F8);
 }
-.logout-icon { font-size: 18px; }
 .logout-text {
-  color: var(--primary-color, #4f46e5);
-  font-size: 16px;
-  font-weight: 900;
-  transition: color 0.35s ease;
+  color: var(--color-danger, #D96A63);
+  font-size: 14px;
+  font-weight: 500;
 }
-
 .login-action-btn {
   width: 100%;
   height: 72px;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   color: #fff;
-  border-radius: 24px;
+  border-radius: var(--radius-lg, 16px);
   border: none;
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 14px 32px var(--primary-glow, rgba(79, 70, 229, 0.32));
+  box-shadow: 0 14px 32px var(--primary-glow, rgba(47, 93, 107, 0.32));
   position: relative;
   overflow: hidden;
   transition: background 0.35s ease, box-shadow 0.35s ease;
@@ -469,14 +611,7 @@ const handleLogout = () => {
 .login-action-btn::after { border: none; }
 .login-action-btn:active { transform: scale(0.98); opacity: 0.92; }
 .login-btn-txt { color: #fff; position: relative; z-index: 1; }
-.btn-shine {
-  position: absolute; inset: 0; 
-  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent);
-  transform: translateX(-100%); animation: shine 3s infinite;
-}
-@keyframes shine { 0% { transform: translateX(-100%) rotate(45deg); } 100% { transform: translateX(200%) rotate(45deg); } }
-
-.bottom-safe-fill { height: 140px; }
+.bottom-safe-fill { height: 16px; }
 
 /* Staggered Entrance Animations */
 .animate-in {

@@ -40,7 +40,8 @@
               <view class="hero-status">
                 <block v-if="budgetProgress >= 100">
                   <text class="status-dot danger"></text>
-                  <text class="status-txt danger">本月预算已用尽 ⚠️</text>
+                  <text class="status-txt danger">本月预算已用尽</text>
+                  <AppIcon name="alert" :size="12" tone="expense" />
                 </block>
                 <block v-else-if="todayChange !== 0">
                   <text class="status-dot"></text>
@@ -109,11 +110,11 @@
         <view class="stat-pill stat-pill-card stat-pill-theme">
           <view class="pill-accent"></view>
           <view class="pill-icon-wrap pill-icon-theme">
-            <text class="pill-emoji">🛒</text>
+            <AppIcon name="shopping-cart-2" :size="14" />
           </view>
           <view class="pill-info">
             <text class="pill-l">本月最大开支</text>
-            <text class="pill-v category-txt" :style="{ color: maxExpenseCategory ? primaryColor : '#94A3B8' }">
+            <text class="pill-v category-txt" :style="{ color: maxExpenseCategory ? primaryColor : 'var(--text-muted, #5D6E84)' }">
               {{ maxExpenseCategory || '暂无数据' }}
             </text>
           </view>
@@ -121,7 +122,7 @@
         <view class="stat-pill stat-pill-card stat-pill-income">
           <view class="pill-accent pill-accent-income"></view>
           <view class="pill-icon-wrap pill-icon-income">
-            <text class="pill-emoji">👤</text>
+            <AppIcon name="user-2" :size="14" />
           </view>
           <view class="pill-info">
             <text class="pill-l">本月贡献</text>
@@ -131,7 +132,7 @@
                   <text  class="contributor-name">{{ topContributor.name }}</text>
                 </view>
                 <view class="right">
-                  <text :style="{ color: topContributor.pct ? '#EF4444' : '#94A3B8' }" class="contributor-pct">({{ topContributor.pct }}%)</text>
+                  <text :style="{ color: topContributor.pct ? expenseColor : 'var(--text-muted, #5D6E84)' }" class="contributor-pct">({{ topContributor.pct }}%)</text>
                 </view>
               </block>
               <text v-else>准备开始</text>
@@ -169,7 +170,7 @@
             :class="{ 'is-locked-item': isLocked(act) }"
             @click="onActivityClick(act)"
           >
-            <image :src="act.creatorAvatar || `https://i.pravatar.cc/100?u=${act.creatorNickname}`" class="act-avt" />
+            <UserAvatar :src="act.creatorAvatar" :name="act.creatorNickname" :size="44" radius="14px" class="act-avt" />
             <view class="act-info">
               <view class="act-main">
                 <text class="act-user">{{ act.creatorNickname }}</text>
@@ -187,7 +188,7 @@
             <!-- 权限遮罩层 -->
         <!--    <view v-if="isLocked(act)" class="item-permission-mask">
               <view class="mask-badge">
-                <text class="mb-icon">🔒</text>
+                <AppIcon name="lock" :size="16" />
                 <text class="mb-txt">申请查看权限</text>
               </view>
             </view> -->
@@ -201,7 +202,7 @@
           </view>
           <view class="empty-illustration">
             <view class="icon-blob"></view>
-            <text class="emoji">📒</text>
+            <AppIcon name="notebook-2" :size="20" />
           </view>
           <text class="empty-h1">今日暂无账目</text>
           <text class="empty-p">当天的收支会出现在这里。过了今天的记录，请到「全部/历史」查看。</text>
@@ -246,11 +247,11 @@
         </view>
         <view class="panel-options">
           <view class="option-item" @click="handleEdit">
-            <text class="opt-icon">✏️</text>
+            <AppIcon name="edit-2" :size="16" />
             <text class="opt-txt">编辑此条记录</text>
           </view>
           <view class="option-item danger" @click="handleDelete">
-            <text class="opt-icon">🗑️</text>
+            <AppIcon name="delete-2" :size="16" />
             <text class="opt-txt">删除此条记录</text>
           </view>
         </view>
@@ -268,8 +269,10 @@ import { roomApi, taskApi } from '../../common/api';
 import { formatRelativeTime, formatPrice } from '../../pages/js/utils.js';
 import BudgetEditorModal from '../common/BudgetEditorModal.vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
+import { withWarmup } from '@/common/utils/prefetch.js';
+import UserAvatar from '../common/UserAvatar.vue'
 
-const { themeClass, primaryColor } = useAppTheme();
+const { themeClass, primaryColor, expenseColor } = useAppTheme();
 
 const props = defineProps({
   roomId: { type: [String, Number], default: '' },
@@ -280,16 +283,14 @@ const props = defineProps({
   }
 });
 
-// --- 权限相关模拟逻辑 ---
-const isRestricted = ref(true); // 模拟当前房间开启了隐私保护
 const isLocked = (act) => {
   const { userRole, currentUserId } = props.roomDetail;
   
   // owner 和 admin 不锁定
   if (userRole === 'owner' || userRole === 'admin') return false;
   
-  // observer 锁定所有
-  if (userRole === 'observer') return true;
+  // 只读成员不能修改任何流水
+  if (userRole === 'viewer') return true;
   
   // member 锁定他人的记录（只能编辑/删除自己创建的）
   if (userRole === 'member') return currentUserId !== act.createdBy;
@@ -297,19 +298,6 @@ const isLocked = (act) => {
   // 默认锁定（安全起见）
   return true;
 };
-
-const handleRequestAccess = () => {
-  uni.showModal({
-    title: '权限申请',
-    content: '该记录由其他成员发布并受隐私保护，是否向其申请查看权限？',
-    confirmText: '发起申请',
-    confirmColor: primaryColor.value,
-    success: (res) => {
-      if (res.confirm) uni.showToast({ title: '申请已发送', icon: 'success' });
-    }
-  });
-};
-// ----------------------
 
 const isSummaryLoading = ref(true);
 const isListLoading = ref(true);
@@ -352,7 +340,7 @@ const sheetMaskStyle = computed(() => {
 
 const sheetPanelStyle = computed(() => ({
   transform: `translateY(${sheetPanelY.value}px)`,
-  transition: isSheetSwiping.value ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)'
+  transition: isSheetSwiping.value ? 'none' : 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)'
 }));
 
 const closeActionSheet = () => {
@@ -390,7 +378,7 @@ const lefgerAll = () => {
   })
 }
 
-const canImport = computed(() => props.roomDetail && props.roomDetail.userRole !== 'observer')
+const canImport = computed(() => props.roomDetail && ['owner', 'admin', 'member'].includes(props.roomDetail.userRole))
 
 const goToImport = () => {
   if (!canImport.value) return
@@ -425,15 +413,23 @@ onUnmounted(() => {
 const getLedgerList = async () => {
   isListLoading.value = true;
   try {
-    const res = await roomApi.ledgerList({ "roomId": props.roomId });
-    if (res.code == 0) activities.value = res.data.rows;
+    // 看板进入时已并发预热过，这里直接复用；没有预热就现发一次
+    const res = await withWarmup(`ledgerList:${props.roomId}`, () =>
+      roomApi.ledgerList({ "roomId": props.roomId })
+    );
+    // 接口返回的是 { list, total }；旧代码读的是 .rows，导致首页账单列表永远是空的
+    if (res.code == 0) {
+      activities.value = (res.data && (res.data.list || res.data.rows)) || [];
+    }
   } finally { isListLoading.value = false; }
 };
 
 const getLedgersummary = async () => {
   isSummaryLoading.value = true;
   try {
-    const res = await roomApi.ledgerSummary({ "roomId": props.roomId });
+    const res = await withWarmup(`ledgerSummary:${props.roomId}`, () =>
+      roomApi.ledgerSummary({ "roomId": props.roomId })
+    );
     if (res.code == 0) {
       const d = res.data;
       monthIncome.value = d.total_income || 0;
@@ -492,7 +488,7 @@ const handleDelete = () => {
   uni.showModal({
     title: '确认删除',
     content: '确定要删除这条账目吗？',
-    confirmColor: '#EF4444',
+    confirmColor: expenseColor.value,
     success: async (res) => {
       if (res.confirm) {
         closeActionSheet();
@@ -509,6 +505,8 @@ const handleDelete = () => {
 </script>
 
 <style scoped>
+@import '../../common/styles/theme-tokens.css';
+
 /* 贡献者盒子终极修正方案：强制对等分配 */
 .contributor-box {
   display: flex !important;
@@ -519,8 +517,8 @@ const handleDelete = () => {
 
 .left,
 .right {
-  flex: 1 !important;    /* 🔥 核心：强制分配剩余空间 */
-  width: 0 !important;   /* 🔥 核心：忽略内容宽度，确保严格 50% */
+  flex: 1 !important;    /* 核心：强制分配剩余空间 */
+  width: 0 !important;   /* 核心：忽略内容宽度，确保严格 50% */
   min-width: 0;
   display: flex;
   align-items: center;
@@ -554,8 +552,6 @@ const handleDelete = () => {
   position: absolute;
   inset: 0;
   background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
   z-index: 10;
   display: flex;
   align-items: center;
@@ -574,7 +570,7 @@ const handleDelete = () => {
 }
 
 .mb-icon { font-size: 14px; }
-.mb-txt { font-size: 12px; font-weight: 800; color: #64748B; }
+.mb-txt { font-size: 12px; font-weight: 600; color: var(--text-sub, #64748B); }
 
 .is-locked-item .act-info, 
 .is-locked-item .act-right {
@@ -592,7 +588,7 @@ const handleDelete = () => {
   padding: 16px;
   margin-bottom: 12px;
   box-shadow:
-    0 10px 32px var(--primary-glow, rgba(79, 70, 229, 0.08)),
+    0 10px 32px var(--primary-glow, rgba(47, 93, 107, 0.08)),
     0 2px 10px rgba(15, 23, 42, 0.04);
   border: 1px solid #f1f5f9;
   overflow: hidden;
@@ -612,7 +608,7 @@ const handleDelete = () => {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   opacity: 0.1;
   filter: blur(32px);
   transition: background 0.35s ease;
@@ -625,7 +621,7 @@ const handleDelete = () => {
   background: linear-gradient(
     145deg,
     #ffffff 0%,
-    var(--primary-soft, #eef2ff) 55%,
+    var(--primary-soft, #e9f0f2) 55%,
     rgba(255, 255, 255, 0.6) 100%
   );
   opacity: 0.85;
@@ -649,59 +645,59 @@ const handleDelete = () => {
 .hero-icon-box {
   width: 38px;
   height: 38px;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 16px var(--primary-glow, rgba(79, 70, 229, 0.22));
+  box-shadow: 0 6px 16px var(--primary-glow, rgba(47, 93, 107, 0.22));
   transition: background 0.35s ease, box-shadow 0.35s ease;
   flex-shrink: 0;
 }
 .hero-icon-box.is-warning {
-  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  background: linear-gradient(135deg, var(--color-warning, #F59E0B), #fbbf24);
   box-shadow: 0 10px 24px rgba(245, 158, 11, 0.25);
 }
 .hero-icon-box.is-danger {
-  background: linear-gradient(135deg, #ef4444, #f87171);
+  background: linear-gradient(135deg, var(--color-expense, #EF4444), #f87171);
   box-shadow: 0 10px 24px rgba(239, 68, 68, 0.25);
 }
 .hero-icon-box.is-zero {
-  background: var(--primary-soft, #eef2ff);
-  box-shadow: 0 6px 16px var(--primary-glow, rgba(79, 70, 229, 0.12));
+  background: var(--primary-soft, #e9f0f2);
+  box-shadow: 0 6px 16px var(--primary-glow, rgba(47, 93, 107, 0.12));
 }
 .hero-icon {
   color: #fff;
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
 }
 .hero-icon-box.is-zero .hero-icon {
-  color: var(--primary-color, #4f46e5);
+  color: var(--primary-color, #2f5d6b);
 }
 
 .hero-label-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hero-label {
   font-size: 11px;
-  font-weight: 800;
-  color: #64748b;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
   letter-spacing: 0.5px;
 }
 .hero-scope-hint {
   font-size: 9px;
-  font-weight: 700;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   line-height: 1.3;
 }
 .hero-status { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
-.status-dot { width: 5px; height: 5px; background: #10b981; border-radius: 50%; flex-shrink: 0; }
-.status-dot.danger { background: #ef4444; }
-.status-txt { font-size: 10px; font-weight: 700; color: #10b981; }
-.status-txt.danger { color: #ef4444; }
-.status-txt.zero { color: #94a3b8; font-weight: 600; }
+.status-dot { width: 5px; height: 5px; background: var(--color-income, #10B981); border-radius: 50%; flex-shrink: 0; }
+.status-dot.danger { background: var(--color-expense, #EF4444); }
+.status-txt { font-size: 10px; font-weight: 600; color: var(--color-income, #10B981); }
+.status-txt.danger { color: var(--color-expense, #EF4444); }
+.status-txt.zero { color: var(--text-muted, #94A3B8); font-weight: 600; }
 
 .hero-more-btn {
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   padding: 6px 12px;
   border-radius: 100px;
   display: flex;
@@ -712,8 +708,8 @@ const handleDelete = () => {
 .hero-more-press { transform: scale(0.96); opacity: 0.88; }
 .more-btn-txt {
   font-size: 10px;
-  font-weight: 800;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
 }
 
 .hero-main {
@@ -742,21 +738,21 @@ const handleDelete = () => {
 }
 .amount-caption {
   font-size: 9px;
-  font-weight: 800;
-  color: #94a3b8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   letter-spacing: 0.3px;
 }
 .amount-sym {
   font-size: 16px;
-  font-weight: 900;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
   margin-bottom: 3px;
 }
 .amount-val {
   font-size: 32px;
-  font-weight: 900;
-  color: #0f172a;
-  letter-spacing: -1px;
+  font-weight: 600;
+  color: var(--text-ink, #0F172A);
+  letter-spacing: 0;
   line-height: 1;
 }
 
@@ -774,16 +770,16 @@ const handleDelete = () => {
 }
 .mini-label {
   font-size: 9px;
-  font-weight: 800;
-  color: #cbd5e1;
+  font-weight: 600;
+  color: var(--text-faint, #CBD5E1);
 }
 .mini-val {
   font-size: 12px;
-  font-weight: 900;
-  color: #1e293b;
+  font-weight: 600;
+  color: var(--text-ink, #1E293B);
 }
-.mini-val.up { color: #f43f5e; }
-.mini-val.down { color: #10b981; }
+.mini-val.up { color: var(--color-expense, #F43F5E); }
+.mini-val.down { color: var(--color-income, #10B981); }
 
 .hero-footer {
   border-top: 1px solid #f1f5f9;
@@ -796,47 +792,47 @@ const handleDelete = () => {
   margin-bottom: 8px;
 }
 .budget-label-row { display: flex; align-items: center; gap: 8px; }
-.budget-label { font-size: 10px; font-weight: 700; color: #94a3b8; }
+.budget-label { font-size: 10px; font-weight: 600; color: var(--text-muted, #94A3B8); }
 
 .budget-edit-link {
   font-size: 10px;
-  font-weight: 800;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
   padding: 2px 8px;
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   border-radius: 100px;
 }
 .budget-edit-link:active { opacity: 0.65; }
 
-.budget-pct { font-size: 11px; font-weight: 900; color: var(--primary-color, #4f46e5); }
-.budget-pct.warning { color: #f59e0b; }
-.budget-pct.danger { color: #ef4444; }
-.budget-pct.zero { color: #94a3b8; }
+.budget-pct { font-size: 11px; font-weight: 600; color: var(--primary-color, #2f5d6b); }
+.budget-pct.warning { color: var(--color-warning, #F59E0B); }
+.budget-pct.danger { color: var(--color-expense, #EF4444); }
+.budget-pct.zero { color: var(--text-muted, #94A3B8); }
 
 .budget-track {
   height: 7px;
-  background: #dfe5ee;
+  background: var(--line-hairline, #DFE5EE);
   border-radius: 100px;
   overflow: hidden;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
   transition: background 0.35s ease;
 }
 .budget-track.track-zero {
-  background: #d8dee8;
+  background: var(--line-hairline, #D8DEE8);
   box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 .budget-bar {
   height: 100%;
   min-width: 0;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   border-radius: 100px;
   transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease;
 }
 .budget-bar.bar-empty {
   display: none;
 }
-.bar-warning { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-.bar-danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+.bar-warning { background: linear-gradient(90deg, var(--color-warning, #F59E0B), #fbbf24); }
+.bar-danger { background: linear-gradient(90deg, var(--color-expense, #EF4444), #f87171); }
 
 .ledger-quick-stats { display: flex; gap: 10px; margin-bottom: 12px; }
 
@@ -856,7 +852,7 @@ const handleDelete = () => {
   background: #fff;
   border: 1px solid rgba(255, 255, 255, 0.95);
   box-shadow:
-    0 10px 28px var(--primary-glow, rgba(79, 70, 229, 0.12)),
+    0 10px 28px var(--primary-glow, rgba(47, 93, 107, 0.12)),
     0 4px 14px rgba(15, 23, 42, 0.05);
   transition: box-shadow 0.35s ease, border-color 0.35s ease, transform 0.2s ease;
 }
@@ -872,12 +868,12 @@ const handleDelete = () => {
   bottom: 12px;
   width: 4px;
   border-radius: 0 6px 6px 0;
-  background: var(--primary-color, #4F46E5);
+  background: var(--primary-color, #2F5D6B);
   transition: background 0.35s ease;
 }
 
 .pill-accent-income {
-  background: #10B981;
+  background: var(--color-income, #10B981);
 }
 
 .pill-icon-wrap {
@@ -891,18 +887,18 @@ const handleDelete = () => {
 }
 
 .pill-icon-theme {
-  background: var(--primary-soft, #EEF2FF);
+  background: var(--primary-soft, #E9F0F2);
   transition: background 0.35s ease;
 }
 
 .pill-icon-income {
-  background: #ECFDF5;
+  background: var(--color-income-soft, #ECFDF5);
 }
 
 .pill-emoji { font-size: 18px; }
 .pill-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.pill-l { font-size: 9px; font-weight: 800; color: #94A3B8; text-transform: uppercase; margin-bottom: 2px; }
-.pill-v { font-size: 12px; font-weight: 900; display: flex; align-items: center; }
+.pill-l { font-size: 9px; font-weight: 600; color: var(--text-muted, #94A3B8); text-transform: uppercase; margin-bottom: 2px; }
+.pill-v { font-size: 12px; font-weight: 600; display: flex; align-items: center; }
 
 .section-title-row {
   margin-bottom: 10px;
@@ -919,21 +915,21 @@ const handleDelete = () => {
   min-width: 0;
   flex: 1;
 }
-.section-title { font-size: 16px; font-weight: 900; color: #1E293B; }
+.section-title { font-size: 16px; font-weight: 600; color: var(--text-ink, #1E293B); }
 .section-subtitle {
   font-size: 10px;
-  font-weight: 700;
-  color: #94A3B8;
+  font-weight: 600;
+  color: var(--text-muted, #94A3B8);
   line-height: 1.3;
 }
-.section-more { font-size: 12px; font-weight: 800; color: var(--primary-color, #4F46E5); }
+.section-more { font-size: 12px; font-weight: 600; color: var(--primary-color, #2F5D6B); }
 .section-actions {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
 }
-.section-import { font-size: 12px; font-weight: 800; color: #64748B; }
+.section-import { font-size: 12px; font-weight: 600; color: var(--text-sub, #64748B); }
 
 .activity-list { background: #fff; border-radius: 32px; padding: 8px; border: 1px solid #F1F5F9; }
 .act-item { display: flex; align-items: center; padding: 16px; border-bottom: 1px solid #F8FAFC; transition: background 0.2s; }
@@ -942,18 +938,16 @@ const handleDelete = () => {
 .act-avt { width: 44px; height: 44px; border-radius: 14px; margin-right: 14px; background: #f0f0f0; }
 .act-info { flex: 1; display: flex; flex-direction: column; }
 .act-main { display: flex; align-items: center; gap: 6px; }
-.act-user { font-size: 14px; font-weight: 800; color: #1E293B; }
-.act-desc { font-size: 13px; font-weight: 700; color: #94A3B8; }
-.act-time { font-size: 10px; font-weight: 800; color: #CBD5E1; margin-top: 2px; }
+.act-user { font-size: 14px; font-weight: 600; color: var(--text-ink, #1E293B); }
+.act-desc { font-size: 13px; font-weight: 600; color: var(--text-muted, #94A3B8); }
+.act-time { font-size: 10px; font-weight: 600; color: var(--text-faint, #CBD5E1); margin-top: 2px; }
 .act-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.act-amount { font-size: 15px; font-weight: 900; color: #F43F5E; }
-.act-amount.exp { color: #10B981; }
+.act-amount { font-size: 15px; font-weight: 600; color: var(--color-expense, #F43F5E); }
+.act-amount.exp { color: var(--color-income, #10B981); }
 
 .action-sheet-mask {
   position: fixed;
   inset: 0;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   z-index: 1000;
   display: flex;
   align-items: flex-end;
@@ -967,7 +961,7 @@ const handleDelete = () => {
   background: #fff;
   border-radius: 44px 44px 0 0;
   padding: 20px 24px 12px;
-  box-shadow: 0 -20px 60px var(--primary-glow, rgba(79, 70, 229, 0.12));
+  box-shadow: 0 -20px 60px var(--primary-glow, rgba(47, 93, 107, 0.12));
   will-change: transform;
 }
 .panel-handle {
@@ -979,11 +973,11 @@ const handleDelete = () => {
   transition: background 0.35s ease;
 }
 .panel-header { margin-bottom: 20px; padding: 0 4px; }
-.panel-title { font-size: 19px; font-weight: 900; color: #1e293b; display: block; }
+.panel-title { font-size: 19px; font-weight: 600; color: var(--text-ink, #1E293B); display: block; }
 .panel-subtitle {
   font-size: 12px;
-  font-weight: 800;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
   margin-top: 6px;
   display: block;
   opacity: 0.85;
@@ -993,7 +987,7 @@ const handleDelete = () => {
 .panel-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .option-item {
   height: 64px;
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   border-radius: 20px;
   display: flex;
   align-items: center;
@@ -1005,18 +999,18 @@ const handleDelete = () => {
 .opt-icon { font-size: 20px; }
 .opt-txt {
   font-size: 15px;
-  font-weight: 900;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
   transition: color 0.35s ease;
 }
 .option-item.danger {
-  background: #fff1f2;
+  background: var(--color-expense-soft, #FFF1F2);
 }
-.option-item.danger .opt-txt { color: #f43f5e; }
+.option-item.danger .opt-txt { color: var(--color-expense, #F43F5E); }
 .panel-cancel-btn {
   width: 100%;
   height: 56px;
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   border-radius: 20px;
   display: flex;
   align-items: center;
@@ -1027,8 +1021,8 @@ const handleDelete = () => {
 }
 .panel-cancel-txt {
   font-size: 15px;
-  font-weight: 900;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
   line-height: 1;
   transition: color 0.35s ease;
 }
@@ -1052,32 +1046,32 @@ const handleDelete = () => {
   padding: 8px 16px;
   margin-bottom: 20px;
   border-radius: 100px;
-  background: var(--primary-soft, #eef2ff);
+  background: var(--primary-soft, #e9f0f2);
   border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 16px var(--primary-glow, rgba(79, 70, 229, 0.12));
+  box-shadow: 0 4px 16px var(--primary-glow, rgba(47, 93, 107, 0.12));
 }
 .empty-today-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--primary-color, #4f46e5);
+  background: var(--primary-color, #2f5d6b);
   flex-shrink: 0;
 }
 .empty-today-txt {
   font-size: 12px;
-  font-weight: 900;
-  color: var(--primary-color, #4f46e5);
+  font-weight: 600;
+  color: var(--primary-color, #2f5d6b);
   letter-spacing: 0.5px;
 }
 .empty-illustration { position: relative; width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
-.icon-blob { position: absolute; inset: 0; background: var(--primary-soft, #EEF2FF); border-radius: 35% 65% 70% 30% / 30% 30% 70% 70%; animation: blobMelt 8s infinite alternate; }
+.icon-blob { position: absolute; inset: 0; background: var(--primary-soft, #E9F0F2); border-radius: 35% 65% 70% 30% / 30% 30% 70% 70%; animation: blobMelt 8s infinite alternate; }
 @keyframes blobMelt { to { border-radius: 65% 35% 30% 70% / 70% 70% 30% 30%; transform: rotate(45deg); } }
 .empty-illustration .emoji { font-size: 44px; position: relative; z-index: 1; }
-.empty-h1 { font-size: 18px; font-weight: 900; color: #1E293B; margin-bottom: 10px; }
+.empty-h1 { font-size: 18px; font-weight: 600; color: var(--text-ink, #1E293B); margin-bottom: 10px; }
 .empty-p {
   font-size: 13px;
-  font-weight: 700;
-  color: #64748B;
+  font-weight: 600;
+  color: var(--text-sub, #64748B);
   line-height: 1.65;
   max-width: 260px;
 }
@@ -1090,12 +1084,12 @@ const handleDelete = () => {
   padding: 0 22px;
   height: 48px;
   border-radius: 100px;
-  background: var(--primary-color, #4f46e5);
-  box-shadow: 0 10px 28px var(--primary-glow, rgba(79, 70, 229, 0.28));
+  background: var(--primary-color, #2f5d6b);
+  box-shadow: 0 10px 28px var(--primary-glow, rgba(47, 93, 107, 0.28));
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
 .empty-history-press { transform: scale(0.97); opacity: 0.9; }
-.empty-history-btn-txt { font-size: 14px; font-weight: 900; color: #fff; }
+.empty-history-btn-txt { font-size: 14px; font-weight: 600; color: #fff; }
 .empty-history-btn-arrow { font-size: 18px; font-weight: 300; color: #fff; margin-top: -2px; }
 
 .shimmer { position: relative; overflow: hidden; background: #F1F5F9 !important; }
@@ -1104,6 +1098,7 @@ const handleDelete = () => {
 
 .animate-fade-in { animation: fadeIn 0.4s ease-out both; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.animate-panel-up { animation: panelUp 0.4s cubic-bezier(0.19, 1, 0.22, 1) both; }
+.animate-panel-up { animation: panelUp 0.4s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @keyframes panelUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>
+import AppIcon from '../common/AppIcon.vue'
