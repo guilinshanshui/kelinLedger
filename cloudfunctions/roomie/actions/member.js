@@ -1,4 +1,5 @@
 const { requireUser, requireMembership } = require('../lib/context')
+const { badRequest } = require('../lib/errors')
 const membership = require('../lib/membership')
 
 /**

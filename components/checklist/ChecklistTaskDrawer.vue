@@ -145,6 +145,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
 import BottomPicker from '../common/BottomPicker.vue'
+import AppIcon from '../common/AppIcon.vue'
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import { getDateStr, normalizeTaskDueDate } from '../../pages/js/utils.js'
 import { resolveTaskLedgerSummary } from '../../common/utils/checklistTaskDisplay.js'
@@ -400,10 +401,10 @@ function handleDelete() {
 }
 
 function openLedgerRecord(record) {
-  if (!props.roomId || !props.accountId || !record?.id) return
-  uni.navigateTo({
-    url: `/pages/add-entry/add-entry?roomId=${props.roomId}&accountId=${props.accountId}&id=${record.id}`
-  })
+  if (!props.roomId || !record?.id) return
+  let url = `/pages/add-entry/add-entry?roomId=${props.roomId}&id=${record.id}`
+  if (props.accountId) url += `&accountId=${props.accountId}`
+  uni.navigateTo({ url })
 }
 
 function handleAddLedger() {
@@ -738,4 +739,3 @@ function handleViewLedgers() {
   border: 1px solid var(--line-hairline, #E2E8F0);
 }
 </style>
-import AppIcon from '../common/AppIcon.vue'

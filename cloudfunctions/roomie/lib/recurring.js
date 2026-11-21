@@ -10,6 +10,7 @@ const { nextId } = require('./id')
 const { badRequest, notFound } = require('./errors')
 const { toYuan, toMinor } = require('./money')
 const { pushNotificationMany } = require('./notify')
+const { cnParts, cnDayStart } = require('./dates')
 const accounts = require('./accounts')
 
 /**
@@ -23,8 +24,8 @@ const accounts = require('./accounts')
  */
 
 const currentMonth = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const { year, month } = cnParts(new Date())
+  return `${year}-${String(month).padStart(2, '0')}`
 }
 
 function shapeRecurring(row) {
@@ -113,8 +114,8 @@ async function deleteRecurring(roomId, id) {
  * @param {Date}   today  基准日期，便于测试注入
  */
 async function generateDue(roomId, today = new Date()) {
-  const month = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-  const day = today.getDate()
+  const { year: cnYear, month: cnMonth, day } = cnParts(today)
+  const month = `${cnYear}-${String(cnMonth).padStart(2, '0')}`
 
   const where = { status: _.neq('deleted') }
   if (roomId) where.roomId = roomId
@@ -127,8 +128,9 @@ async function generateDue(roomId, today = new Date()) {
     if (rule.lastGeneratedMonth === month) continue
     if ((rule.dayOfMonth || 1) > day) continue
 
-    // 用当月的目标日作为发生时间
-    const occurredAt = new Date(today.getFullYear(), today.getMonth(), rule.dayOfMonth || 1, 12, 0, 0).toISOString()
+    // 用当月的目标日中午（北京时间 12:00）作为发生时间
+    const dayStartMs = cnDayStart(cnYear, cnMonth, rule.dayOfMonth || 1).getTime()
+    const occurredAt = new Date(dayStartMs + 12 * 3600 * 1000).toISOString()
     const now = new Date().toISOString()
 
     const entry = {

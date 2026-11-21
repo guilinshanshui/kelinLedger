@@ -136,7 +136,7 @@
       <text class="fab-label-txt">新建待办</text>
     </view>
 
-    <view class="fab-multi-container" v-if="!isLoading && !isError && currentTab === 'schedule'">
+    <view class="fab-multi-container" v-if="!isLoading && !isError && canWrite && currentTab === 'schedule'">
       <view v-if="isFabOpen" class="fab-overlay-blur" @click="isFabOpen = false"></view>
       <view class="fab-menu-stack" :class="{ 'is-open': isFabOpen }">
         <view class="fab-menu-panel">
@@ -285,8 +285,8 @@ const dashRoomId = computed(() => {
 });
 
 const dashAccountId = computed(() => {
-  const id = roomDetail.value?.accountsList?.[0]?.id;
-  return id != null && id !== '' ? String(id) : '';
+  const id = roomDetail.value?.defaultAccountId || roomDetail.value?.accountsList?.[0]?.id;
+  return id != null && id !== '' && String(id) !== '0' ? String(id) : '';
 });
 
 const canManageRoom = computed(() => {
@@ -592,7 +592,17 @@ const handleActionDelete = () => {
 
 
 const goBack = () => goBackSafe();
-const handleInvite = () => { showInviteModal.value = true; };
+const handleInvite = async () => {
+  if (roomDetail.value && !roomDetail.value.inviteCode && dashRoomId.value) {
+    try {
+      const res = await roomApi.generateInviteCode(dashRoomId.value);
+      if (res?.code == 0 && res.data?.code) {
+        roomDetail.value.inviteCode = res.data.code;
+      }
+    } catch (e) {}
+  }
+  showInviteModal.value = true;
+};
 
 // 处理分享事件
 const handleShare = (shareData) => {
@@ -605,10 +615,14 @@ const onChecklistFabClick = () => {
 };
 
 const onFabClick = () => {
-  if (currentTab.value === 'ledger' || currentTab.value === 'combo') {
-    var accountId=0;
-    if(roomDetail.value?.accountsList?.length > 0) accountId = roomDetail.value.accountsList[0].id;
-    uni.navigateTo({ url: `/pages/add-entry/add-entry?roomId=${roomDetail.value.id}&accountId=${accountId}` });
+  if (currentTab.value === 'combo') {
+    uni.$emit('open_combo_create');
+    return;
+  }
+  if (currentTab.value === 'ledger') {
+    let url = `/pages/add-entry/add-entry?roomId=${dashRoomId.value}`;
+    if (dashAccountId.value) url += `&accountId=${dashAccountId.value}`;
+    uni.navigateTo({ url });
   }
 };
 </script>

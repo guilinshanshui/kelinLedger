@@ -112,11 +112,11 @@
                       <AppIcon :value="item.categoryIcon" :size="20" />
             </view>
             <view class="entry-main">
-              <text class="entry-name">{{ item.categoryName || '未分类' }}</text>
+              <text class="entry-name">{{ item.type === 'transfer' && item.accountName && item.toAccountName ? `${item.accountName} → ${item.toAccountName}` : (item.categoryName || (item.type === 'transfer' ? '转账' : '未分类')) }}</text>
               <text v-if="item.note" class="entry-note">{{ item.note }}</text>
             </view>
-            <text class="entry-amount" :class="item.type === 'income' ? 'income' : 'expense'">
-              {{ item.type === 'income' ? '+' : '-' }}{{ formatMoneyShort(item.amount) }}
+            <text class="entry-amount" :class="item.type === 'income' ? 'income' : (item.type === 'expense' ? 'expense' : 'neutral')">
+              {{ item.type === 'income' ? '+' : (item.type === 'expense' ? '-' : '') }}{{ formatMoneyShort(item.amount) }}
             </text>
           </view>
         </view>
@@ -132,7 +132,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import AppIcon from '../../components/common/AppIcon.vue'
@@ -268,7 +268,9 @@ const loadMonth = async () => {
           type: item.type,
           amount: item.amount,
           categoryName: item.categoryName,
-          categoryIcon: item.categoryIcon,
+          categoryIcon: item.categoryIcon || 'mc:puzzled',
+          accountName: item.accountName || '',
+          toAccountName: item.toAccountName || '',
           note: item.note
         }))
       }
@@ -341,6 +343,11 @@ onLoad((options) => {
   }
 
   loadMonth()
+  uni.$on('refresh_ledger_data', loadMonth)
+})
+
+onUnmounted(() => {
+  uni.$off('refresh_ledger_data', loadMonth)
 })
 </script>
 
@@ -690,7 +697,10 @@ onLoad((options) => {
   color: var(--color-income, #3E8E6E);
 }
 .entry-amount.expense {
-  color: var(--text-ink, #1E293B);
+  color: var(--color-expense, #C4554D);
+}
+.entry-amount.neutral {
+  color: var(--text-sub, #475569);
 }
 
 .detail-empty {

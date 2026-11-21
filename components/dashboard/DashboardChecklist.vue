@@ -134,8 +134,8 @@
         <view v-for="(msg, i) in (notifications || [])" :key="i" class="reminder-item">
           <view class="r-dot" :class="{ unread: !msg.read }"></view>
           <view class="r-body">
-            <text class="r-txt">{{ msg.nickName || '' }} {{ msg.message }}</text>
-            <text class="r-time">{{ formatRelativeTime(msg.createdAt) }}</text>
+            <text class="r-txt">{{ msg.body || (msg.nickName ? msg.nickName + ' ' + (msg.message || '') : (msg.message || msg.title || '')) }}</text>
+            <text class="r-time">{{ formatRelativeTime(msg.createTime || msg.createdAt) }}</text>
           </view>
         </view>
         <view v-if="!notifications || notifications.length === 0" class="empty-notif">
@@ -181,6 +181,7 @@ import {
 } from '../../common/utils/checklistTaskDisplay.js'
 import { coalesce, pickApiList } from '@/common/utils/coalesce.js'
 import BottomPicker from '../common/BottomPicker.vue'
+import AppIcon from '../common/AppIcon.vue'
 import ChecklistQuickAdd from '../checklist/ChecklistQuickAdd.vue'
 import ChecklistTaskLine from '../checklist/ChecklistTaskLine.vue'
 
@@ -629,7 +630,10 @@ const addTask = async (taskData) => {
 
 const clearReminders = async () => {
   if (!notifications.value?.length) return
-  const res = await taskApi.notificationRead(notifications.value.map(n => n.id))
+  const res = await taskApi.notificationRead({
+    roomId: props.roomId,
+    ids: notifications.value.map(n => n.id)
+  })
   if (res.code == 0) {
     notifications.value = []
     showReminders.value = false
@@ -692,7 +696,7 @@ async function onCompleteTask(task) {
   completingId.value = task.id
   completePhase.value = 'sweep'
 
-  const apiPromise = taskApi.complateTask(task.id).catch(() => ({ code: -1 }))
+  const apiPromise = taskApi.complateTask(task.id, props.roomId).catch(() => ({ code: -1 }))
 
   await waitMs(COMPLETE_SWEEP_MS)
   if (!isTaskCompleting(task)) return
@@ -1137,4 +1141,3 @@ const goToAddEntry = () => {
 }
 @keyframes shimmerAnim { 100% { transform: translateX(100%); } }
 </style>
-import AppIcon from '../common/AppIcon.vue'

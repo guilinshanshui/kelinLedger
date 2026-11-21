@@ -126,7 +126,10 @@ export function isEmpty(value) {
  */
 
 export function getDateStr(ts) {
-  const d = new Date(ts)
+  if (!ts && ts !== 0) return ''
+  const num = Number(ts)
+  const d = !isNaN(num) && String(ts).trim() !== '' ? new Date(num) : new Date(ts)
+  if (isNaN(d.getTime())) return ''
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -241,7 +244,8 @@ export const formatPrice = (val) => {
 export const formatRelativeTime = (timestamp) => {
   if (!timestamp) return '';
   const now = new Date();
-  const d = new Date(Number(timestamp));
+  const num = Number(timestamp);
+  const d = !isNaN(num) && String(timestamp).trim() !== '' ? new Date(num) : new Date(timestamp);
   if (isNaN(d.getTime())) return '';
   const diff = now - d;
 

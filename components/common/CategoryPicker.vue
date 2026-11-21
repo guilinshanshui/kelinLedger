@@ -127,11 +127,14 @@ const panelStyle = computed(() => panelTransform.value);
 
 // 判断二级项是否被选中（兼容 ID 和 Label 匹配）
 const isItemSelected = (sub) => {
-  return props.currentSelected === sub.id || props.currentSelected === sub.label;
+  if (props.currentSelected == null || props.currentSelected === '') return false;
+  return String(props.currentSelected) === String(sub.id) || String(props.currentSelected) === String(sub.label);
 };
 
 const level1Options = computed(() => {
-  return props.options.filter(cat => cat.type === props.transactionType && !cat.parentId);
+  const sameType = props.options.filter(cat => !cat.type || cat.type === props.transactionType);
+  const topLevel = sameType.filter(cat => !cat.parentId);
+  return topLevel.length ? topLevel : sameType;
 });
 
 const level2Options = computed(() => {
@@ -188,7 +191,7 @@ const onLevel1Click = (item) => {
  */
 const gridOptions = computed(() => {
   const hasHierarchy = props.options.some((cat) => cat.parentId)
-  if (hasHierarchy) return level2Options.value
+  if (hasHierarchy && level2Options.value.length > 0) return level2Options.value
   return level1Options.value
 })
 

@@ -47,7 +47,7 @@
                   <text class="status-dot"></text>
                   <text class="status-txt">今日变动 {{ todayChange > 0 ? '+' : '' }}{{ formatPrice(todayChange) }}</text>
                 </block>
-                <text v-else class="status-txt zero">下方查看今日流水</text>
+                <text v-else class="status-txt zero">下方查看近期收支明细</text>
               </view>
             </view>
           </view>
@@ -144,8 +144,8 @@
 
     <view class="section-title-row">
       <view class="section-title-group">
-        <text class="section-title">今日收支</text>
-        <text class="section-subtitle">仅展示今天 · 更早记录点右侧</text>
+        <text class="section-title">近期收支明细</text>
+        <text class="section-subtitle">展示最近记录 · 更多历史点右侧</text>
       </view>
       <view class="section-actions">
         <text v-if="canImport" class="section-import" @click="goToImport">导入账单</text>
@@ -173,14 +173,14 @@
             <UserAvatar :src="act.creatorAvatar" :name="act.creatorNickname" :size="44" radius="14px" class="act-avt" />
             <view class="act-info">
               <view class="act-main">
-                <text class="act-user">{{ act.creatorNickname }}</text>
-                <text class="act-desc">{{ act.action || act.note || (act.type === 'expense' ? '支出' : '收入') }}</text>
+                <text class="act-user">{{ act.creatorNickname || '成员' }}</text>
+                <text class="act-desc">{{ formatActivityDesc(act) }}</text>
               </view>
-              <text class="act-time">{{ formatRelativeTime(act.entryTime) }}</text>
+              <text class="act-time">{{ formatRelativeTime(act.entryTime || act.occurredAt || act.createTime) }}</text>
             </view>
             <view class="act-right">
-              <text class="act-amount" :class="{ 'exp': act.type === 'expense' }">
-                {{ act.type === 'expense' ? '-' : '+' }}{{ formatPrice(act.amount) }}
+              <text class="act-amount" :class="{ 'exp': act.type === 'expense', 'transfer': act.type === 'transfer' }">
+                {{ act.type === 'expense' ? '-' : (act.type === 'income' ? '+' : '') }}{{ formatPrice(act.amount) }}
               </text>
             <image  class="act-more-icon" v-if="!isLocked(act)" src="/static/icon-more.png" style="width: 25px;height: 25px;" />
             </view>
@@ -198,14 +198,14 @@
         <view v-else class="empty-state-card">
           <view class="empty-today-badge">
             <text class="empty-today-dot"></text>
-            <text class="empty-today-txt">仅展示今日收支</text>
+            <text class="empty-today-txt">近期收支明细</text>
           </view>
           <view class="empty-illustration">
             <view class="icon-blob"></view>
             <AppIcon name="notebook-2" :size="20" />
           </view>
-          <text class="empty-h1">今日暂无账目</text>
-          <text class="empty-p">当天的收支会出现在这里。过了今天的记录，请到「全部/历史」查看。</text>
+          <text class="empty-h1">暂无收支记录</text>
+          <text class="empty-p">点击右下角「记一笔」或上方「导入账单」，记录第一笔家庭收支。</text>
           <view class="empty-history-btn" hover-class="empty-history-press" @click="lefgerAll">
             <text class="empty-history-btn-txt">查看全部历史</text>
             <text class="empty-history-btn-arrow">›</text>
@@ -266,11 +266,12 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, reactive, watch } from 'vue';
 import { roomApi, taskApi } from '../../common/api';
-import { formatRelativeTime, formatPrice } from '../../pages/js/utils.js';
+import { formatRelativeTime, formatPrice, getDateStr } from '../../pages/js/utils.js';
 import BudgetEditorModal from '../common/BudgetEditorModal.vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
 import { withWarmup } from '@/common/utils/prefetch.js';
-import UserAvatar from '../common/UserAvatar.vue'
+import UserAvatar from '../common/UserAvatar.vue';
+import AppIcon from '../common/AppIcon.vue';
 
 const { themeClass, primaryColor, expenseColor } = useAppTheme();
 
@@ -283,8 +284,20 @@ const props = defineProps({
   }
 });
 
+const formatActivityDesc = (act) => {
+  if (!act) return '';
+  if (act.action) return act.action;
+  if (act.type === 'transfer' && act.accountName && act.toAccountName) {
+    return `${act.accountName} → ${act.toAccountName}${act.note ? ' · ' + act.note : ''}`;
+  }
+  if (act.categoryName && act.note && act.categoryName !== act.note) {
+    return `${act.categoryName} · ${act.note}`;
+  }
+  return act.note || act.categoryName || (act.type === 'expense' ? '支出' : (act.type === 'transfer' ? '转账' : '收入'));
+};
+
 const isLocked = (act) => {
-  const { userRole, currentUserId } = props.roomDetail;
+  const { userRole, currentUserId } = props.roomDetail || {};
   
   // owner 和 admin 不锁定
   if (userRole === 'owner' || userRole === 'admin') return false;
@@ -293,7 +306,7 @@ const isLocked = (act) => {
   if (userRole === 'viewer') return true;
   
   // member 锁定他人的记录（只能编辑/删除自己创建的）
-  if (userRole === 'member') return currentUserId !== act.createdBy;
+  if (userRole === 'member') return String(currentUserId || '') !== String(act.createdBy || act.userId || '');
   
   // 默认锁定（安全起见）
   return true;
@@ -401,13 +414,11 @@ const refreshAllData = () => {
 
 onMounted(() => {
   refreshAllData();
-  uni.$on('refresh_ledger_data', () => {
-    refreshAllData();
-  });
+  uni.$on('refresh_ledger_data', refreshAllData);
 });
 
 onUnmounted(() => {
-  uni.$off('refresh_ledger_data');
+  uni.$off('refresh_ledger_data', refreshAllData);
 });
 
 const getLedgerList = async () => {
@@ -415,7 +426,7 @@ const getLedgerList = async () => {
   try {
     // 看板进入时已并发预热过，这里直接复用；没有预热就现发一次
     const res = await withWarmup(`ledgerList:${props.roomId}`, () =>
-      roomApi.ledgerList({ "roomId": props.roomId })
+      roomApi.ledgerList({ roomId: props.roomId })
     );
     // 接口返回的是 { list, total }；旧代码读的是 .rows，导致首页账单列表永远是空的
     if (res.code == 0) {
@@ -431,17 +442,21 @@ const getLedgersummary = async () => {
       roomApi.ledgerSummary({ "roomId": props.roomId })
     );
     if (res.code == 0) {
-      const d = res.data;
-      monthIncome.value = d.total_income || 0;
-      monthExpense.value = d.total_expense || 0;
-	  budgetLimit.value=d.budget|| 3000;
-      totalBalance.value = d.net_amount || 0;
-      maxExpenseCategory.value = d.max_category || "";
-      if (d.top_contributor) {
-        topContributor.name = d.top_contributor.nickname || "";
-        topContributor.pct = d.top_contributor.pct || 0;
+      const d = res.data || {};
+      monthIncome.value = Number(d.total_income ?? d.totalIncome ?? 0);
+      monthExpense.value = Number(d.total_expense ?? d.totalExpense ?? 0);
+      budgetLimit.value = Number(d.budget_limit ?? d.budget ?? 3000);
+      totalBalance.value = Number(d.net_amount ?? d.totalBalance ?? d.balance ?? 0);
+      todayChange.value = Number(d.today_change ?? d.todayChange ?? 0);
+      maxExpenseCategory.value = d.max_category ?? d.maxCategory ?? "";
+      const tc = d.top_contributor || d.topContributor;
+      if (tc) {
+        topContributor.name = tc.nickname || tc.name || "";
+        topContributor.pct = tc.pct || 0;
+      } else {
+        topContributor.name = "";
+        topContributor.pct = 0;
       }
-      if (d.budget_limit) budgetLimit.value = d.budget_limit;
     }
   } finally { isSummaryLoading.value = false; }
 };
@@ -470,7 +485,7 @@ const handleSaveBudget = async (newVal) => {
 
 const onActivityClick = (act) => {
   if (isLocked(act)) {
-    // handleRequestAccess();
+    uni.navigateTo({ url: `/pages/add-entry/add-entry?id=${act.id}&roomId=${props.roomId}&accountId=${props.accountId}&readonly=1` });
     return;
   }
   selectedActivity.value = act;
@@ -778,8 +793,8 @@ const handleDelete = () => {
   font-weight: 600;
   color: var(--text-ink, #1E293B);
 }
-.mini-val.up { color: var(--color-expense, #F43F5E); }
-.mini-val.down { color: var(--color-income, #10B981); }
+.mini-val.up { color: var(--color-income, #10B981); }
+.mini-val.down { color: var(--color-expense, #F43F5E); }
 
 .hero-footer {
   border-top: 1px solid #f1f5f9;
@@ -942,8 +957,9 @@ const handleDelete = () => {
 .act-desc { font-size: 13px; font-weight: 600; color: var(--text-muted, #94A3B8); }
 .act-time { font-size: 10px; font-weight: 600; color: var(--text-faint, #CBD5E1); margin-top: 2px; }
 .act-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.act-amount { font-size: 15px; font-weight: 600; color: var(--color-expense, #F43F5E); }
-.act-amount.exp { color: var(--color-income, #10B981); }
+.act-amount { font-size: 15px; font-weight: 600; color: var(--color-income, #10B981); }
+.act-amount.exp { color: var(--color-expense, #F43F5E); }
+.act-amount.transfer { color: var(--text-sub, #475569); }
 
 .action-sheet-mask {
   position: fixed;
@@ -1101,4 +1117,3 @@ const handleDelete = () => {
 .animate-panel-up { animation: panelUp 0.4s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @keyframes panelUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>
-import AppIcon from '../common/AppIcon.vue'

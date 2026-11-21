@@ -255,6 +255,7 @@ import { ref, reactive, watch, computed } from 'vue';
 import { getTimeStr, getDateStr } from '../../pages/js/utils.js';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
 import GlobalDrawer from './GlobalDrawer.vue';
+import AppIcon from './AppIcon.vue';
 import {
   REMIND_OFFSET_OPTIONS,
   buildRemindPreview,
@@ -1283,4 +1284,3 @@ const handleDelete = () => {
   letter-spacing: 0.5px;
 }
 </style>
-import AppIcon from './AppIcon.vue';

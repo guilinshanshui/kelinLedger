@@ -9,8 +9,8 @@
 
     <!-- 只读提示：既不是创建者也不是管理员时，这笔账单只能看不能改 -->
     <view v-if="id && !canOperate" class="readonly-banner">
-              <AppIcon name="eye" :size="14" tone="secondary" />
-      <text class="readonly-txt">只能浏览：这笔账单由 {{ member || '其他成员' }} 记录</text>
+      <AppIcon name="eye" :size="14" tone="secondary" />
+      <text class="readonly-txt">{{ canEditServer ? '浏览模式：左滑账单列表项可编辑或删除' : `只能浏览：这笔账单由 ${member || '其他成员'} 记录` }}</text>
     </view>
     <scroll-view 
       scroll-y 
@@ -72,7 +72,8 @@
                 placeholder="0.00" 
                 placeholder-style="color: var(--text-faint, #66788D); font-weight: 600;"
                 :cursor-color="themeColor"
-                focus
+                :focus="canOperate && !id"
+                :disabled="!canOperate"
                 @focus="isAmountFocused = true"
                 @blur="isAmountFocused = false"
               />
@@ -88,7 +89,7 @@
               <view class="add-row-icon g" :style="{ backgroundColor: themeColor + '14' }">
                 <AppIcon :value="currentCategoryIcon" :size="20" :color="themeColor" />
               </view>
-              <text class="add-row-label">{{ typeLabel }}分类</text>
+              <text class="add-row-label">{{ transactionType === 'transfer' ? '转入账户' : typeLabel + '分类' }}</text>
             </view>
             <view class="add-row-right">
               <view class="category-path" v-if="transactionType === 'expense' && parentCategoryDisplay">
@@ -101,7 +102,7 @@
           </view>
 
           <!-- 成员选择 -->
-          <view class="add-row" @click="showMemberPicker = true">
+          <view class="add-row" @click="canOperate && (showMemberPicker = true)">
             <view class="add-row-left">
               <view class="add-row-icon b" :style="{ backgroundColor: themeColor + '14' }">
                 <AppIcon name="user-2" :size="20" :color="themeColor" />
@@ -115,11 +116,11 @@
                 </view>
               </view>
               <text class="add-row-val ml-1">{{ member || '请选择' }}</text>
-              <text class="add-row-arrow ml-1">›</text>
+              <text v-if="canOperate" class="add-row-arrow ml-1">›</text>
             </view>
           </view>
           
-          <view class="add-row" @click="showDatePicker = true">
+          <view class="add-row" @click="canOperate && (showDatePicker = true)">
             <view class="add-row-left">
               <view class="add-row-icon p" :style="{ backgroundColor: themeColor + '14' }">
                 <AppIcon name="calendar-2" :size="20" :color="themeColor" />
@@ -128,11 +129,11 @@
             </view>
             <view class="add-row-right">
               <text class="add-row-val">{{ date }}</text>
-              <text class="add-row-arrow">›</text>
+              <text v-if="canOperate" class="add-row-arrow">›</text>
             </view>
           </view>
 		  
-		  <view v-if="transactionType != 'transfer'" class="add-row" @click="showPayPicker = true">
+		  <view v-if="transactionType != 'transfer'" class="add-row" @click="canOperate && (showPayPicker = true)">
 		    <view class="add-row-left">
 		      <view class="add-row-icon g" :style="{ backgroundColor: themeColor + '14' }">
 		        <AppIcon :value="currentPayIcon" :size="20" :color="themeColor" />
@@ -141,7 +142,7 @@
 		    </view>
 		    <view class="add-row-right">
 		      <text class="add-row-val">{{ pay || '请选择' }}</text>
-		      <text class="add-row-arrow">›</text>
+		      <text v-if="canOperate" class="add-row-arrow">›</text>
 		    </view>
 		  </view>
 
@@ -160,6 +161,7 @@
                 v-model="note" 
                 class="add-textarea-memo" 
                 placeholder="记录这一刻的碎碎念..."
+                :disabled="!canOperate"
                 @focus="isMemoFocused = true"
                 @blur="isMemoFocused = false" 
                 placeholder-style="color: var(--text-faint, #66788D); font-weight: 500;" 
@@ -206,7 +208,7 @@
 
     <BottomPicker 
       v-model="showSingleCategoryPicker"
-      :title="'选择' + typeLabel + '分类'"
+      :title="transactionType === 'transfer' ? '选择转入账户' : '选择' + typeLabel + '分类'"
       layout="grid"
       :cols="3"
       :options="flatCategories"
@@ -287,6 +289,8 @@ const accountId = ref(null);
 const id = ref(null);
 /** 能否改动这笔账单：创建者本人或 owner/admin 为 true，其他人只读。 */
 const canOperate = ref(true);
+const canEditServer = ref(true);
+const detailUserId = ref('');
 /**
  * 浏览模式：从账单列表点进来只是「看详情」，不直接进编辑。
  * 这样做是为了防误触——编辑入口统一收到左滑菜单里。
@@ -355,6 +359,7 @@ const currentPayIcon = computed(() => {
 });
 
 const onCategoryRowClick = () => {
+  if (!canOperate.value) return;
   // 支出/收入/转账统一走 BottomPicker，保持弹层动画与选中样式一致
   showSingleCategoryPicker.value = true;
 };
@@ -402,10 +407,19 @@ const memoFocusBorderStyle = computed(() => {
 
 onLoad((e) => {
   roomId.value = e.roomId;
-  accountId.value = e.accountId;
+  const rawAccId = e.accountId;
+  accountId.value = rawAccId && String(rawAccId) !== '0' && String(rawAccId) !== 'undefined' && String(rawAccId) !== 'null'
+    ? rawAccId
+    : '';
   id.value = e.id;
   // 从流水列表点进来时会带上原类型，直接落在对应的支出 / 收入 / 转账页签
-  if (e.readonly === '1') browseMode.value = true;
+  if (e.readonly === '1') {
+    browseMode.value = true;
+    canOperate.value = false;
+    isAmountFocused.value = false;
+  } else if (e.id) {
+    isAmountFocused.value = false;
+  }
   if (['expense', 'income', 'transfer'].includes(e.type)) {
     transactionType.value = e.type;
   }
@@ -492,6 +506,28 @@ const timeOfDayOf = (value) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
+const syncMemberFromDetail = (detail = {}) => {
+  const uid = detail.userId || detail.createdBy || detailUserId.value;
+  const nickname = detail.creatorNickname || '';
+  const found = memberOptions.value.find(
+    (item) => (uid && String(item.userId) === String(uid)) || (nickname && item.label === nickname)
+  );
+  if (found) {
+    member.value = found.label;
+    memberInfo.value = found;
+  } else if (nickname) {
+    member.value = nickname;
+    memberInfo.value = {
+      id: uid || '',
+      userId: uid || '',
+      label: nickname,
+      nickname,
+      avatar: detail.creatorAvatar || '',
+      icon: detail.creatorAvatar || 'mc:user-2'
+    };
+  }
+};
+
 /** 编辑回填：一笔账单的金额 / 分类 / 账户 / 备注 / 日期都要回到它自己身上。 */
 const getDetail = async (id) => {
   const res = await roomApi.ledgerDetail({ id: id, roomId: roomId.value });
@@ -499,7 +535,8 @@ const getDetail = async (id) => {
 
   const detail = res.data || {};
   // 权限由服务端下发：不是创建者也不是管理员时，这页只展示不可改
-  canOperate.value = detail.canEdit !== false && !browseMode.value;
+  canEditServer.value = detail.canEdit !== false;
+  canOperate.value = canEditServer.value && !browseMode.value;
   // 类型决定顶部页签，编辑收入 / 转账不能还停在支出
   if (['expense', 'income', 'transfer'].includes(detail.type)) {
     transactionType.value = detail.type;
@@ -513,7 +550,8 @@ const getDetail = async (id) => {
   categoryInfo.value = detail.type === 'transfer'
     ? { id: detail.toAccountId, label: category.value }
     : { id: detail.categoryId, label: category.value };
-  member.value = detail.creatorNickname || member.value;
+  detailUserId.value = detail.userId || detail.createdBy || '';
+  syncMemberFromDetail(detail);
   pay.value = detail.payMethodName || '';
   payInfo.value = { id: detail.payMethodId, label: detail.payMethodName || '' };
   // 日期只展示到「天」，但原时刻要留下来，保存时原样写回
@@ -541,18 +579,21 @@ const getMember = async () => {
       console.warn('[记一笔] 账本暂无成员，roomId =', roomId.value)
       return
     }
+    if (detailUserId.value) {
+      syncMemberFromDetail({ userId: detailUserId.value, creatorNickname: member.value });
+      return;
+    }
     // 默认经办人 = 当前登录账户；不在成员列表里时退回第一个成员。
     const currentUserId = String(getCurrentUserId() || '')
     const self = memberOptions.value.find(item => String(item.userId) === currentUserId)
     const target = self || memberOptions.value[0]
-    console.log('[记一笔] 成员列表已加载', memberOptions.value.length, '人，当前用户 =', currentUserId, '命中自己 =', !!self)
     if (!member.value) {
       member.value = target.label;
       memberInfo.value = target;
     } else {
       const existing = memberOptions.value.find(item => item.label === member.value);
       memberInfo.value = existing || target;
-      if (!existing) member.value = target.label;
+      if (!existing && !id.value) member.value = target.label;
     }
   } catch (error) {
     console.error('[记一笔] 成员列表加载失败', error, 'roomId =', roomId.value)
@@ -604,11 +645,6 @@ const getCategoriesList = async () => {
       type: 'transfer',
       label: item.name,
       parentId: ''
-    }))
-    payMethods.value = (payRes.code === 0 ? payRes.data || [] : []).map((item) => ({
-      ...item,
-      label: item.label || item.name,
-      type: 'transfer'
     }))
 
     if (id.value) await getDetail(id.value);
@@ -699,6 +735,7 @@ const saveEntry = async () => {
     const map = {
       accountId: accountId.value,
       roomId: roomId.value,
+      userId: memberInfo.value?.userId || memberInfo.value?.id || '',
       amount: amount.value,
       note: note.value,
       type: transactionType.value,
@@ -726,7 +763,8 @@ const saveEntry = async () => {
         goBackSafe();
       }
     } else {
-      uni.showToast({ title: res.msg, icon: 'none' });
+      uni.hideLoading();
+      uni.showToast({ title: res.message || res.msg || '保存失败', icon: 'none' });
     }
   } catch (e) {
     uni.hideLoading();

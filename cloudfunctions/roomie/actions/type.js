@@ -9,30 +9,30 @@
 const { ROOM_FEATURES } = require('../lib/roomFeatures')
 
 const ROOM_TEMPLATES = [
-  { code: 'family', label: '家庭', icon: 'mc:home-5', desc: '一家人的共同空间' },
-  { code: 'couple', label: '情侣', icon: 'mc:love', desc: '两个人一起生活' },
-  { code: 'roommate', label: '合租', icon: 'mc:sofa', desc: '室友分摊与清单' },
-  { code: 'travel', label: '旅行', icon: 'mc:airplane', desc: '出行 AA 与行程' },
-  { code: 'custom', label: '自定义', icon: 'mc:palette-2', desc: '自己定义名称与图标' }
+  { id: 'family', code: 'family', label: '家庭', icon: 'mc:home-5', desc: '一家人的共同空间' },
+  { id: 'couple', code: 'couple', label: '情侣', icon: 'mc:love', desc: '两个人一起生活' },
+  { id: 'roommate', code: 'roommate', label: '合租', icon: 'mc:sofa', desc: '室友分摊与清单' },
+  { id: 'travel', code: 'travel', label: '旅行', icon: 'mc:airplane', desc: '出行 AA 与行程' },
+  { id: 'custom', code: 'custom', label: '自定义', icon: 'mc:palette-2', desc: '自己定义名称与图标' }
 ]
 
 const ROOM_ICONS = [
-  { label: '家庭', icon: 'mc:home-5' },
-  { label: '情侣', icon: 'mc:love' },
-  { label: '合租', icon: 'mc:sofa' },
-  { label: '旅行', icon: 'mc:airplane' },
-  { label: '宝宝', icon: 'mc:baby' },
-  { label: '宠物', icon: 'mc:cat' },
-  { label: '工作', icon: 'mc:briefcase' },
-  { label: '学习', icon: 'mc:book-2' },
-  { label: '运动', icon: 'mc:run' },
-  { label: '美食', icon: 'mc:dinner' },
-  { label: '游戏', icon: 'mc:game-2' },
-  { label: '存钱', icon: 'mc:pig-money' },
-  { label: '礼物', icon: 'mc:gift-2' },
-  { label: '旅行箱', icon: 'mc:luggage' },
-  { label: '星星', icon: 'mc:star-2' },
-  { label: '植物', icon: 'mc:leaf' }
+  { id: 'home-5', label: '家庭', icon: 'mc:home-5' },
+  { id: 'love', label: '情侣', icon: 'mc:love' },
+  { id: 'sofa', label: '合租', icon: 'mc:sofa' },
+  { id: 'airplane', label: '旅行', icon: 'mc:airplane' },
+  { id: 'baby', label: '宝宝', icon: 'mc:baby' },
+  { id: 'cat', label: '宠物', icon: 'mc:cat' },
+  { id: 'briefcase', label: '工作', icon: 'mc:briefcase' },
+  { id: 'book-2', label: '学习', icon: 'mc:book-2' },
+  { id: 'run', label: '运动', icon: 'mc:run' },
+  { id: 'dinner', label: '美食', icon: 'mc:dinner' },
+  { id: 'game-2', label: '游戏', icon: 'mc:game-2' },
+  { id: 'pig-money', label: '存钱', icon: 'mc:pig-money' },
+  { id: 'gift-2', label: '礼物', icon: 'mc:gift-2' },
+  { id: 'luggage', label: '旅行箱', icon: 'mc:luggage' },
+  { id: 'star-2', label: '星星', icon: 'mc:star-2' },
+  { id: 'leaf', label: '植物', icon: 'mc:leaf' }
 ]
 
 const WHEEL_PRESETS = [

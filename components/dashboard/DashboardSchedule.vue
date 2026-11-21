@@ -72,7 +72,7 @@
     <!-- 事件列表：选中日期 + 即将到来（两层） -->
     <view class="schedule-stream">
       <!-- 第一块：随选中日期切换 -->
-      <view class="stream-section">
+      <view v-if="enrichedBirthdays.length > 0 || normalizedSchedules.length > 0" class="stream-section">
         <view class="section-head">
           <text class="section-title">{{ selectedDateSectionTitle }}</text>
         </view>
@@ -174,6 +174,7 @@ import { useAppTheme } from '@/common/themes/useAppTheme.js'
 const { themeClass } = useAppTheme()
 
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import AppIcon from '../common/AppIcon.vue';
 import { taskApi } from '../../common/api';
 import { toTimestamp } from '../../pages/js/utils.js';
 import { markScheduleHomeDirty } from '../../common/utils/scheduleHomePreview.js';
@@ -203,19 +204,30 @@ const props = defineProps({
   roomId: { type: [String, Number], default: '' }
 });
 
+const formatDate = (d) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const date = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${date}`;
+};
+
 const isExpanded = ref(false);
-const selectedDate = ref(new Date().toISOString().split('T')[0]);
+const selectedDate = ref(formatDate(new Date()));
 const viewDate = ref(new Date());
-const todayStr = ref(new Date().toISOString().split('T')[0]);
+const todayStr = ref(formatDate(new Date()));
 
 const rawSchedules = ref([]);
 const rawBirthdays = ref([]);
 const wechatSubscribeReady = ref(false);
 
-const parseTimestamp = (ts) => {
-  if (!ts) return { date: '', time: '09:00' };
-  const d = new Date(Number(ts));
-  if (isNaN(d.getTime())) return { date: '', time: '09:00' };
+const parseTimestamp = (ts, fallbackDate = '') => {
+  if (!ts && !fallbackDate) return { date: '', time: '09:00' };
+  if (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts.trim())) {
+    return { date: ts.trim(), time: '09:00' };
+  }
+  const num = Number(ts);
+  const d = !isNaN(num) && String(ts || '').trim() !== '' ? new Date(num) : new Date(ts || fallbackDate);
+  if (isNaN(d.getTime())) return { date: fallbackDate || '', time: '09:00' };
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const date = String(d.getDate()).padStart(2, '0');
@@ -225,13 +237,6 @@ const parseTimestamp = (ts) => {
     date: `${year}-${month}-${date}`,
     time: `${hour}:${min}`
   };
-};
-
-const formatDate = (d) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const date = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${date}`;
 };
 
 const enrichBirthday = (item) => {
@@ -252,12 +257,12 @@ const enrichBirthday = (item) => {
 
 const normalizedSchedules = computed(() => {
   return (rawSchedules.value || []).map(item => {
-    const parsed = parseTimestamp(item.startTime);
+    const parsed = parseTimestamp(item.startTime, item.date);
     return {
       ...item,
       ...normalizeRemindFields({ ...item, scheduleType: 'schedule' }),
-      date: parsed.date,
-      time: parsed.time,
+      date: parsed.date || item.date || '',
+      time: item.remindTime || parsed.time,
       isBirthday: false
     };
   });
@@ -289,12 +294,15 @@ const upcomingBirthdays = computed(() => {
 });
 
 const monthOverview = computed(() => {
+  const year = viewDate.value.getFullYear();
   const month = viewDate.value.getMonth() + 1;
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1);
   const count = enrichedBirthdays.value.filter((b) => {
     const nextParts = (b.nextDate || '').split('-');
     return parseInt(nextParts[1], 10) === month;
   }).length;
-  const todayCount = todayBirthdays.value.length;
+  const todayCount = isCurrentMonth ? todayBirthdays.value.length : 0;
   return { month, count, todayCount };
 });
 
@@ -982,4 +990,3 @@ const onTouchEnd = (e) => {
   to { opacity: 1; transform: translateY(0); }
 }
 </style>
-import AppIcon from '../common/AppIcon.vue';

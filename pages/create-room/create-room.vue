@@ -43,7 +43,7 @@
           <view v-else class="type-grid">
             <view 
               v-for="item in roomTemplates" 
-              :key="item.id"
+              :key="item.id || item.code"
               class="type-card"
               :class="{ 'type-active': selectedType === item.code }"
               @click="handleTypeSelect(item)"
@@ -87,8 +87,8 @@
             <view class="card-right">
               <view v-if="selectedFeatures.length > 0" class="feature-stack">
                 <view 
-                  v-for="(f, fidx) in selectedFeatures" 
-                  :key="f.id" 
+                  v-for="(f, fidx) in selectedFeatures.slice(0, 4)" 
+                  :key="f.id || f.code" 
                   class="feat-stack-item"
                   :style="{ 
                     zIndex: 10 - fidx, 
@@ -158,6 +158,7 @@ import IosNav from '../../components/nav/ios-nav.vue';
 import BottomPicker from '../../components/common/BottomPicker.vue';
 import AppIcon from '../../components/common/AppIcon.vue';
 import { typeApi, userApi, roomApi } from '@/common/api';
+import { STORAGE_KEYS } from '@/common/config';
 import { useUserStore } from '@/store/user';
 import { goBackSafe } from '@/common/utils/nav.js'
 
@@ -245,6 +246,8 @@ const handleTypeSelect = (item) => {
   template.value = item;
   if (item.code === 'custom') {
     showCustomEditor.value = true;
+  } else if (item.icon) {
+    customIcon.value = item.icon;
   }
 };
 
@@ -276,16 +279,25 @@ const handleCreate = async () => {
     const map = {
       "name": roomName.value,
       "icon": customIcon.value,
-      "templateId": template.value.id,
+      "templateId": template.value.id || template.value.code || '',
       // 功能模块按数组提交，后端会逐个校验；老字段 featuresId 已不再使用
       "features": selectedFeatures.value.map((f) => f.code)
     };
     uni.showLoading({ title: '正在建立空间...' });
     const res = await roomApi.createRoom(map);
     if (res.code == 0) {
-		uni.$emit('refresh_room_data');
+      if (res.data && res.data.id) {
+        try {
+          uni.setStorageSync(STORAGE_KEYS.CURRENT_ROOM, {
+            id: res.data.id,
+            name: res.data.name || roomName.value,
+            avatar: res.data.avatar || customIcon.value || 'mc:notebook-2'
+          });
+        } catch (err) {}
+      }
+      uni.$emit('refresh_room_data');
       uni.showToast({ title: '空间已就绪', icon: 'success' });
-	  useUserStore().refreshProfile().catch(() => {});
+      useUserStore().refreshProfile().catch(() => {});
       setTimeout(() => {
         uni.hideLoading();
         goBackSafe();

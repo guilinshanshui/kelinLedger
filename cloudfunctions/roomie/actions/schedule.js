@@ -6,6 +6,8 @@ const { requireString, optionalString, toBool } = require('../lib/validate')
 const { publishFeed, FEED_TYPES } = require('../lib/activity')
 const { pushNotificationMany } = require('../lib/notify')
 const { nextReminderAt } = require('../lib/reminders')
+const { lunarBirthdayInSolarYear } = require('../lib/lunar')
+const { dayKey } = require('../lib/dates')
 
 const NOT_DELETED = _.neq(true)
 const ALLOWED_OFFSETS = [0, -1, -3, -7]
@@ -140,9 +142,27 @@ function pickBirthdayFields(payload = {}) {
   return patch
 }
 
+function computeNextBirthdayOccurrence(item) {
+  if (scheduleTypeOf(item) !== 'birthday') return ''
+  const month = Number(item.birthdayMonth)
+  const day = Number(item.birthdayDay)
+  if (!month || !day) return ''
+  const todayYmd = dayKey(new Date())
+  const currentYear = Number(todayYmd.slice(0, 4))
+  const isLunar = item.birthdayCalendar === 'lunar' || item.lunar === 1 || item.lunar === true
+  for (const y of [currentYear, currentYear + 1, currentYear + 2]) {
+    const ymd = isLunar
+      ? lunarBirthdayInSolarYear(y, month, day, !!item.birthdayLeapMonth)
+      : `${y}-${pad2(month)}-${pad2(day)}`
+    if (ymd && ymd >= todayYmd) return ymd
+  }
+  return ''
+}
+
 function shapeSchedule(item) {
   const scheduleType = scheduleTypeOf(item)
   const nextAt = nextReminderAt(item)
+  const nextOccurrenceDate = computeNextBirthdayOccurrence(item)
   return {
     id: item._id,
     roomId: item.roomId,
@@ -168,6 +188,7 @@ function shapeSchedule(item) {
     birthdayDay: item.birthdayDay || 0,
     birthdayLeapMonth: !!item.birthdayLeapMonth,
     lunar: item.lunar === 1 || item.lunar === true ? 1 : 0,
+    nextOccurrenceDate,
     creatorId: item.creatorId,
     creatorName: item.creatorName || '',
     participantIds: item.participantIds || [],
@@ -179,15 +200,19 @@ function shapeSchedule(item) {
   }
 }
 
-async function list({ openid, payload, query }) {
+async function list({ openid, payload = {}, query = {} }) {
   const roomId = roomIdOf(payload, query)
   await requireMembership(openid, roomId, 'viewer')
 
+  const startDate = payload.startDate || query.startDate
+  const endDate = payload.endDate || query.endDate
+  const type = payload.type || query.type
+
   const where = { roomId, deleted: NOT_DELETED }
-  if (payload.startDate && payload.endDate) {
-    where.startTime = _.gte(payload.startDate).and(_.lte(payload.endDate))
+  if (startDate && endDate) {
+    where.startTime = _.gte(startDate).and(_.lte(endDate))
   }
-  if (payload.type) where.type = payload.type
+  if (type) where.type = type
 
   const rows = await listAll(COLLECTIONS.schedules, where, { orderBy: 'startTime', order: 'asc' })
 

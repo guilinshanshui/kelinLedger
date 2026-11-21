@@ -276,10 +276,19 @@ function removeMember(member) {
   })
 }
 
-function openInvite() {
+async function openInvite() {
   if (!canManage.value) {
     uni.showToast({ title: '当前权限不能邀请成员', icon: 'none' })
     return
+  }
+  if (currentRoom.value && !currentRoom.value.inviteCode && roomId.value) {
+    try {
+      const res = await roomApi.generateInviteCode(roomId.value)
+      if (res?.code === 0 && res.data?.code) {
+        const target = rooms.value.find((r) => String(r.id) === String(roomId.value))
+        if (target) target.inviteCode = res.data.code
+      }
+    } catch (e) {}
   }
   showInvite.value = true
 }

@@ -17,7 +17,7 @@ const cloud = require('wx-server-sdk')
 const { pushNotification, pushNotificationMany } = require('./notify')
 const { publishFeed, FEED_TYPES } = require('./activity')
 const { toYuan } = require('./money')
-const { weekRange, monthRange, dayKey, enumerateDays } = require('./dates')
+const { weekRange, monthRange, dayKey, enumerateDays, cnParts } = require('./dates')
 const accounts = require('./accounts')
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -158,15 +158,20 @@ function decorateRoom(room, userId, role) {
   }
 }
 
-/** 房间详情，含成员列表。 */
+/** 房间详情，含成员列表与默认账户。 */
 async function getRoomDetail(roomId, userId = '') {
   const room = await getById(COLLECTIONS.rooms, roomId)
   if (!room || room.status === 'deleted') throw notFound('房间不存在或已解散')
 
-  const members = await listMembers(roomId)
+  const [members, accountsList] = await Promise.all([
+    listMembers(roomId),
+    accounts.listAccounts(roomId)
+  ])
   return {
     ...decorateRoom(room, userId, (members.find((item) => item.userId === userId) || {}).role),
     members,
+    accountsList,
+    defaultAccountId: accountsList[0] ? accountsList[0].id : '',
     budget: toYuan(room.budgetMinor || 0)
   }
 }
@@ -573,8 +578,9 @@ async function deleteRoom(operator, roomId) {
 /** 首页概览：本月收支、预算进度、待办数。 */
 async function dashboardOverview(roomId, userId, { type = 'month' } = {}) {
   const now = new Date()
+  const { year: cnYear, month: cnMonth } = cnParts(now)
   // 资产页支持「本周 / 本月」切换，两个范围共用同一套聚合逻辑
-  const range = type === 'week' ? weekRange(now) : monthRange(now.getFullYear(), now.getMonth() + 1)
+  const range = type === 'week' ? weekRange(now) : monthRange(cnYear, cnMonth)
 
   const [room, entries, tasks, asset] = await Promise.all([
     getById(COLLECTIONS.rooms, roomId),
@@ -627,7 +633,7 @@ async function dashboardOverview(roomId, userId, { type = 'month' } = {}) {
     roomId,
     roomName: room.name,
     period: type || 'month',
-    month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+    month: `${cnYear}-${String(cnMonth).padStart(2, '0')}`,
     totalExpense: toYuan(totalExpense),
     totalIncome: toYuan(totalIncome),
     balance: toYuan(totalIncome - totalExpense),

@@ -12,7 +12,7 @@
       <view v-for="goal in localGoals" :key="goal.id" class="goal-card" @click="selectGoal(goal)">
         <!-- 卡片头部：状态与时间 -->
         <view class="card-top">
-          <view class="goal-status-badge" :style="{ background: goal.progress === 100 ? incomeColor + '15' : goal.themeColor + '15' }">
+          <view class="goal-status-badge" :style="{ background: goal.progress === 100 ? toSoftColor(incomeColor) : toSoftColor(goal.themeColor) }">
             <view class="status-dot" :style="{ background: goal.progress === 100 ? incomeColor : goal.themeColor }"></view>
             <text class="status-txt" :style="{ color: goal.progress === 100 ? incomeColor : goal.themeColor }">
               {{ goal.progress === 100 ? '已达成' : goal.status }}
@@ -200,8 +200,14 @@
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 const { themeClass, primaryColor, softColor, incomeColor, theme } = useAppTheme()
 
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import AppIcon from '../common/AppIcon.vue';
+
+const toSoftColor = (c) => {
+  const str = String(c || '');
+  if (str.startsWith('#') && str.length === 7) return `${str}15`;
+  return softColor.value || '#E9F0F2';
+};
 
 const quickTaskTitle = ref('');
 const quickSub = ref(null); // 'ledger' | 'schedule'
@@ -212,7 +218,7 @@ const localGoals = ref([
     id: 1,
     title: '新房装修',
     icon: 'mc:home-5',
-    themeColor: 'var(--primary-color, #2F5D6B)',
+    themeColor: '#2F5D6B',
     progress: 40,
     status: '进行中',
     timeLeft: '剩余 45 天',
@@ -237,6 +243,40 @@ const localGoals = ref([
     schedules: []
   }
 ]);
+
+const handleCreateGoalPrompt = () => {
+  uni.showModal({
+    title: '新建生活目标',
+    editable: true,
+    placeholderText: '例如：家庭旅行、添置家电...',
+    success: (res) => {
+      const title = (res.content || '').trim();
+      if (res.confirm && title) {
+        localGoals.value.unshift({
+          id: Date.now(),
+          title,
+          icon: 'mc:home-5',
+          themeColor: primaryColor.value || '#2F5D6B',
+          progress: 0,
+          status: '规划中',
+          timeLeft: '进行中',
+          tasks: [],
+          ledgerItems: [],
+          schedules: []
+        });
+        uni.showToast({ title: '已创建目标', icon: 'success' });
+      }
+    }
+  });
+};
+
+onMounted(() => {
+  uni.$on('open_combo_create', handleCreateGoalPrompt);
+});
+
+onUnmounted(() => {
+  uni.$off('open_combo_create', handleCreateGoalPrompt);
+});
 
 const selectedGoal = ref(null);
 const selectGoal = (goal) => { selectedGoal.value = goal; };

@@ -130,7 +130,7 @@
                   <text class="msg-desc">{{ msg.content || msg.message }}</text>
                 </view>
 
-                <view v-if="msg.type === 'invitation' && !msg.handled" class="action-row" @click.stop>
+                <view v-if="(msg.type === 'invitation' || msg.type === 'room_invite') && !msg.handled" class="action-row" @click.stop>
                   <button class="btn-action reject" @click="handleAction(index, msg, 'reject')">拒绝</button>
                   <button class="btn-action accept" @click="handleAction(index, msg, 'accept')">接受</button>
                 </view>
@@ -238,17 +238,19 @@ const getList = async () => {
 
 const messages = ref([])
 
+const isInviteNotification = (m) => Boolean(m && (m.type === 'room_invite' || m.type === 'invitation'));
+
 const filteredMessages = computed(() => {
   if (currentTab.value === 'all') return messages.value;
   if (currentTab.value === 'reminder') {
     return messages.value.filter((m) => isScheduleNotification(m));
   }
   if (currentTab.value === 'invitation') {
-    return messages.value.filter((m) => m.type === 'room_invite');
+    return messages.value.filter((m) => isInviteNotification(m));
   }
   if (currentTab.value === 'system') {
     // 除邀请与日程提醒之外的通知都归入系统，保证每条消息都能在某个页签里看到
-    return messages.value.filter((m) => m.type !== 'room_invite' && !isScheduleNotification(m));
+    return messages.value.filter((m) => !isInviteNotification(m) && !isScheduleNotification(m));
   }
   return [];
 });
@@ -473,7 +475,8 @@ const handleReminderAction = async (index, msg, action) => {
     return;
   }
   if (action === 'snooze') {
-    uni.showToast({ title: '稍后提醒你', icon: 'none' });
+    await markNotificationRead(msg);
+    uni.showToast({ title: '已暂缓，稍后提醒你', icon: 'none' });
   }
 };
 
@@ -492,9 +495,10 @@ const goToLegacyDetail = async (msg, index) => {
 const handleAction = async (index, msg, action) => {
   try {
     uni.showLoading({ title: action === 'accept' ? '正在加入...' : '正在处理...' });
+    const inviteId = msg.targetId || msg.invitationId || msg.id;
     const res = await (action === 'accept'
-      ? roomApi.accecptSigin(msg.id, {})
-      : roomApi.rejectSigin(msg.id, {}));
+      ? roomApi.accecptSigin(inviteId, {})
+      : roomApi.rejectSigin(inviteId, {}));
     if (res.code === 0) {
       if (action === 'accept') {
         uni.$emit('refresh_room_data');
@@ -509,16 +513,23 @@ const handleAction = async (index, msg, action) => {
         }
       }
 
-      if (index !== -1) {
-        messages.value[index] = {
-          ...messages.value[index],
+      const realIdx = messages.value.findIndex((item) => item.id === msg.id);
+      const targetIdx = realIdx !== -1 ? realIdx : index;
+      if (targetIdx !== -1 && messages.value[targetIdx]) {
+        messages.value[targetIdx] = {
+          ...messages.value[targetIdx],
           handled: true,
           handleResult: action === 'accept' ? '已接受' : '已拒绝'
         };
       }
+      await markNotificationRead(msg);
       uni.showToast({ title: '操作成功' });
+    } else {
+      uni.showToast({ title: res.message || '操作失败', icon: 'none' });
     }
   } catch (e) {
+    // request 层已提示错误
+  } finally {
     uni.hideLoading();
   }
 };

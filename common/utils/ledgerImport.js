@@ -146,11 +146,22 @@ export function recomputeMerchantHints(rows = [], existingHints = []) {
   groups.forEach((items, merchantKey) => {
     if (items.length < 2) return
     const ids = [...new Set(items.map((item) => item.editedCategoryId || item.categoryId).filter(Boolean))]
+    const resolvedCount = items.filter((item) => Boolean(item.editedCategoryId || item.categoryId)).length
+    const pendingCount = items.length - resolvedCount
     const suggestedCategoryId = ids.length === 1 ? ids[0] : ''
-    const categoryLabel = items.find((item) => item.editedCategoryLabel)?.editedCategoryLabel || ''
+    const resolvedItem = items.find((item) => item.editedCategoryLabel || item.categoryLabel || item.categoryName)
+    const categoryLabel = (resolvedItem && (resolvedItem.editedCategoryLabel || resolvedItem.categoryLabel || resolvedItem.categoryName)) || ''
     const merchant = items[0].merchant || items[0].product || '该商户'
 
-    if (ids.length > 1) {
+    if (ids.length === 1 && pendingCount > 0) {
+      computed.push({
+        merchantKey,
+        merchant,
+        hintMessage: `已为「${merchant}」选择「${categoryLabel || '分类'}」，可同步到其余 ${pendingCount} 条记录`,
+        suggestedCategoryId,
+        suggestedCategoryLabel: categoryLabel
+      })
+    } else if (ids.length > 1) {
       computed.push({
         merchantKey,
         merchant,

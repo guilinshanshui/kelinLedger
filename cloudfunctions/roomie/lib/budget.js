@@ -2,7 +2,7 @@ const { COLLECTIONS, insert, update, getOne, listAll, removeWhere, _ } = require
 const { nextId } = require('./id')
 const { badRequest } = require('./errors')
 const { toYuan, toMinor } = require('./money')
-const { monthRange } = require('./dates')
+const { monthRange, cnParts } = require('./dates')
 
 /**
  * 预算。
@@ -13,8 +13,8 @@ const { monthRange } = require('./dates')
 
 function normalizeMonth(input) {
   if (input && /^\d{4}-\d{2}$/.test(input)) return input
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const { year, month } = cnParts(new Date())
+  return `${year}-${String(month).padStart(2, '0')}`
 }
 
 function shapeBudget(row) {

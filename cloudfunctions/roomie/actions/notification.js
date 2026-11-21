@@ -23,18 +23,21 @@ function shape(item) {
     type: item.type,
     title: item.title,
     body: item.body || '',
+    message: item.body || item.title || '',
+    nickName: item.title || '',
     targetType: item.targetType || '',
     targetId: item.targetId || '',
     read: !!item.read,
     subtitle: item.subtitle || '',
     triggerTimeLabel: item.triggerTimeLabel || '',
     targetDate: item.targetDate || '',
-    createTime: item.createdAt
+    createTime: item.createdAt,
+    createdAt: item.createdAt
   }
 }
 
 /** 未读通知列表（任务提醒等）。 */
-async function unread({ openid, payload, query }) {
+async function unread({ openid, payload = {}, query = {} }) {
   const user = await requireUser(openid)
   const where = { userId: user.id, read: false, deleted: NOT_DELETED }
   if (roomIdOf(payload, query)) where.roomId = roomIdOf(payload, query)
@@ -44,14 +47,14 @@ async function unread({ openid, payload, query }) {
 }
 
 /** 全部通知分页列表。 */
-async function list({ openid, payload, query }) {
+async function list({ openid, payload = {}, query = {} }) {
   const user = await requireUser(openid)
   const where = { userId: user.id, deleted: NOT_DELETED }
   if (roomIdOf(payload, query)) where.roomId = roomIdOf(payload, query)
 
   const result = await pageQuery(COLLECTIONS.notifications, where, {
-    page: toInt(payload.page, 1),
-    pageSize: toInt(payload.pageSize, 20),
+    page: toInt(payload.page || query.page, 1),
+    pageSize: toInt(payload.pageSize || query.pageSize, 20),
     orderBy: 'createdAt',
     order: 'desc'
   })
@@ -106,8 +109,15 @@ async function markAsRead({ openid, payload, query }) {
 /** 全部标记已读。 */
 async function markRead({ openid, payload, query }) {
   const user = await requireUser(openid)
+  const ids = Array.isArray(payload)
+    ? payload
+    : (Array.isArray(payload && payload.ids) ? payload.ids : null)
   const where = { userId: user.id, read: false, deleted: NOT_DELETED }
-  if (roomIdOf(payload, query)) where.roomId = roomIdOf(payload, query)
+  if (ids && ids.length) {
+    where._id = _.in(ids)
+  } else if (roomIdOf(payload || {}, query || {})) {
+    where.roomId = roomIdOf(payload || {}, query || {})
+  }
 
   const rows = await listAll(COLLECTIONS.notifications, where)
   await Promise.all(

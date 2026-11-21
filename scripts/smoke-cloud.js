@@ -653,6 +653,61 @@ async function main() {
   }, {}, 'openid_a')
   check('未选择账户时拒绝导入', importedMissingAccount.code === 400, `code=${importedMissingAccount.code}`)
 
+  console.log('\n[20] 看板聚合、清单记账关联、农历生日与回归校验')
+  const dashHome = await callOk('/dashboard/home', {}, { roomId: room.id }, 'openid_a')
+  check('房间详情包含默认账户列表', Array.isArray(dashHome.room.accountsList) && dashHome.room.accountsList.length >= 4)
+  check('看板账本汇总包含下划线兼容字段与贡献者',
+    dashHome.ledgerSummary.total_expense === 128.5 &&
+      dashHome.ledgerSummary.total_income === 8000 &&
+      typeof dashHome.ledgerSummary.net_amount === 'number' &&
+      !!dashHome.ledgerSummary.max_category &&
+      !!dashHome.ledgerSummary.top_contributor,
+    JSON.stringify(dashHome.ledgerSummary))
+  check('流水记录返回记账人昵称与 entryTime',
+    dashHome.ledgerList.list.every((item) => !!item.creatorNickname && !!item.entryTime))
+
+  const urgentTask = await callOk('/task/add', {
+    roomId: room.id,
+    title: '买纯净水',
+    isUrgent: 1,
+    dueDate: '2020-01-01'
+  }, {}, 'openid_a')
+  check('任务保存并回显 isUrgent', urgentTask.isUrgent === 1 && urgentTask.priority === 'high')
+
+  const linkedBill = await callOk('/ledger/add', {
+    roomId: room.id,
+    type: 'expense',
+    amount: 35,
+    accountId: '0',
+    taskId: urgentTask.id,
+    note: '买纯净水'
+  }, {}, 'openid_a')
+  check('accountId=0 时自动回退到空间默认账户', !!linkedBill.accountId && linkedBill.accountId !== '0')
+  check('记账保存了关联 taskId', linkedBill.taskId === urgentTask.id)
+
+  const taskSummary = await callOk('/taskLedger/summary', {}, { roomId: room.id }, 'openid_a')
+  check('清单记账汇总仅统计关联了任务的流水',
+    taskSummary.recordCount === 1 && taskSummary.totalExpense === 35,
+    JSON.stringify(taskSummary))
+
+  const allStatusWithOverdue = await callOk('/task/allStatus', {}, { roomId: room.id }, 'openid_a')
+  check('allStatus 返回逾期分组且任务携带关联记账信息',
+    Array.isArray(allStatusWithOverdue.overdue) &&
+      allStatusWithOverdue.overdue.some((t) => t.id === urgentTask.id && t.recordCount === 1))
+
+  const lunarBday = await callOk('/schedule/add', {
+    roomId: room.id,
+    title: '妈妈生日',
+    scheduleType: 'birthday',
+    birthdayCalendar: 'lunar',
+    birthdayMonth: 4,
+    birthdayDay: 15,
+    lunar: 1
+  }, {}, 'openid_a')
+  check('农历生日返回计算后的下次公历日期 nextOccurrenceDate',
+    /^\d{4}-\d{2}-\d{2}$/.test(lunarBday.nextOccurrenceDate),
+    lunarBday.nextOccurrenceDate)
+
   // ---------- 汇总 ----------
   console.log('='.repeat(56))
   console.log(`通过 ${passed} 项，失败 ${failures.length} 项`)

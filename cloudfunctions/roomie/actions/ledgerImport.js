@@ -159,8 +159,12 @@ function parseAmountMinor(amountText) {
 
 function normalizeTime(value) {
   if (!value) return new Date().toISOString()
-  const text = String(value).trim()
-  const parsed = new Date(text.replace(/\//g, '-'))
+  const text = String(value).trim().replace(/\//g, '-')
+  // 微信/支付宝账单时间为北京时间且无时区后缀，补 +08:00 避免在云端 UTC 环境偏移 8 小时
+  const normalized = /^\d{4}-\d{1,2}-\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?$/.test(text)
+    ? `${text.replace(' ', 'T')}${text.includes(':') ? (text.split(':').length === 2 ? ':00' : '') : 'T12:00:00'}+08:00`
+    : text
+  const parsed = new Date(normalized)
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
 }
 
@@ -235,19 +239,32 @@ async function importPreview({ openid, payload }) {
     existing.map((item) => (item.tradeNo ? `no:${item.tradeNo}` : `sig:${item.occurredAt}|${item.amountMinor}|${item.merchant}`))
   )
 
-  const merchantRules = await listAll(COLLECTIONS.merchantRules, { roomId })
+  const [merchantRules, categories, payMethods] = await Promise.all([
+    listAll(COLLECTIONS.merchantRules, { roomId }),
+    listAll(COLLECTIONS.categories, { roomId }),
+    listAll(COLLECTIONS.payMethods, { roomId })
+  ])
   const ruleMap = new Map(merchantRules.map((rule) => [rule.merchantKey, rule]))
+  const categoryMap = new Map(categories.map((cat) => [cat._id, cat]))
+  const payMethodMap = new Map(payMethods.map((pm) => [pm._id, pm]))
 
   const preview = parsed.map((item, index) => {
     const rule = ruleMap.get(item.merchantKey)
+    const matchedCat = rule && rule.categoryId ? categoryMap.get(rule.categoryId) : null
+    const matchedPay = rule && rule.payMethodId ? payMethodMap.get(rule.payMethodId) : null
     return {
       rowId: `row_${index}`,
       ...item,
       duplicate: existingKeys.has(dedupeKey(item)),
       selected: !existingKeys.has(dedupeKey(item)),
-      categoryId: rule ? rule.categoryId : '',
-      payMethodId: rule ? rule.payMethodId : '',
-      remembered: !!rule
+      categoryId: matchedCat ? matchedCat._id : '',
+      categoryName: matchedCat ? matchedCat.name : '',
+      categoryLabel: matchedCat ? matchedCat.name : '',
+      payMethodId: matchedPay ? matchedPay._id : '',
+      payMethodName: matchedPay ? matchedPay.name : item.payMethodName,
+      payLabel: matchedPay ? matchedPay.name : item.payMethodName,
+      categorySource: matchedCat ? 'remembered' : '',
+      remembered: !!matchedCat
     }
   })
 
@@ -298,13 +315,15 @@ async function importConfirm({ openid, payload }) {
         _id: nextId('led'),
         roomId,
         userId: user.id,
+        creatorNickname: user.nickname || '',
+        creatorAvatar: user.avatar || '',
         type: row.type === 'income' ? 'income' : 'expense',
         amountMinor,
         accountId: account._id,
         accountName: account.name,
         categoryId: category ? category._id : '',
         categoryName: category ? category.name : '未分类',
-    categoryIcon: category ? category.icon : 'mc:puzzled',
+        categoryIcon: category ? category.icon : 'mc:puzzled',
         payMethodId: payMethod ? payMethod._id : '',
         payMethodName: payMethod ? payMethod.name : optionalString(row.payMethodName, 20),
         note: optionalString(row.note, 200),
@@ -323,7 +342,8 @@ async function importConfirm({ openid, payload }) {
       success += 1
 
       // 记住商户分类规则，下次导入同商户自动带入
-      if (merchant && category) {
+      const shouldRemember = payload.rememberMerchantRules !== false
+      if (shouldRemember && merchant && category) {
         const existed = await getOne(COLLECTIONS.merchantRules, { roomId, merchantKey: row.merchantKey })
         if (existed) {
           await update(COLLECTIONS.merchantRules, existed._id, {

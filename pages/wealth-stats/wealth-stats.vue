@@ -213,7 +213,7 @@
                   v-for="(point, index) in chartTrend"
                   :key="'tick-' + point.raw"
                   class="axis-cell"
-                  :class="{ first: index === 0, last: index === trend.length - 1 }"
+                  :class="{ first: index === 0, last: index === chartTrend.length - 1 }"
                 >
                   <text v-if="showLabel(index)" class="axis-tick">{{ point.label }}</text>
                 </view>
@@ -310,7 +310,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import { statsApi } from '../../common/api'
@@ -650,6 +650,11 @@ onLoad((options) => {
   }
 
   loadStats()
+  uni.$on('refresh_ledger_data', loadStats)
+})
+
+onUnmounted(() => {
+  uni.$off('refresh_ledger_data', loadStats)
 })
 </script>
 

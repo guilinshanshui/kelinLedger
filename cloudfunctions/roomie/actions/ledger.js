@@ -20,13 +20,16 @@ const budget = require('../lib/budget')
 const settlement = require('../lib/settlement')
 const recurring = require('../lib/recurring')
 const statsLib = require('../lib/stats')
+const membership = require('../lib/membership')
 
 const TYPES = ['expense', 'income', 'transfer']
 const NOT_DELETED = _.neq(true)
 
 const roomIdOf = (payload = {}, query = {}) => payload.roomId || query.roomId
 
-function shapeEntry(entry) {
+function shapeEntry(entry, memberMap = null) {
+  const member = memberMap && entry.userId ? memberMap.get(String(entry.userId)) : null
+  const occurredAt = entry.occurredAt || entry.createdAt
   return {
     id: entry._id,
     roomId: entry.roomId,
@@ -46,12 +49,27 @@ function shapeEntry(entry) {
     payMethodName: entry.payMethodName || '',
     note: entry.note || '',
     merchant: entry.merchant || '',
-    occurredAt: entry.occurredAt,
-    date: dayKey(entry.occurredAt || entry.createdAt),
+    taskId: entry.taskId || '',
+    listId: entry.listId || '',
+    occurredAt,
+    entryTime: occurredAt,
+    date: dayKey(occurredAt),
     source: entry.source || 'manual',
     createdBy: entry.userId,
+    creatorNickname: (member && member.nickname) || entry.creatorNickname || '',
+    creatorAvatar: (member && member.avatar) || entry.creatorAvatar || '',
     createTime: entry.createdAt,
     updateTime: entry.updatedAt
+  }
+}
+
+async function getMemberMap(roomId) {
+  if (!roomId) return new Map()
+  try {
+    const members = await membership.listMembers(roomId)
+    return new Map(members.map((m) => [String(m.userId), m]))
+  } catch (e) {
+    return new Map()
   }
 }
 
@@ -69,6 +87,18 @@ async function resolvePayMethod(roomId, payMethodId) {
   return method
 }
 
+async function resolveDefaultOrAccount(roomId, accountId) {
+  const raw = accountId === undefined || accountId === null ? '' : String(accountId).trim()
+  const id = raw && raw !== '0' && raw !== 'undefined' && raw !== 'null' ? raw : ''
+  if (id) return accounts.requireAccount(roomId, id)
+  const all = await listAll(
+    COLLECTIONS.accounts,
+    { roomId, status: _.neq('deleted') },
+    { orderBy: 'sort', order: 'asc' }
+  )
+  return all[0] || null
+}
+
 /** 新增流水。 */
 async function add({ openid, payload }) {
   const roomId = roomIdOf(payload)
@@ -78,12 +108,15 @@ async function add({ openid, payload }) {
   const amountMinor = toMinor(payload.amount)
   if (amountMinor <= 0) throw badRequest('金额必须大于 0')
 
-  const category = await resolveCategory(roomId, payload.categoryId)
-  const payMethod = await resolvePayMethod(roomId, payload.payMethodId)
+  const [category, payMethod, memberMap] = await Promise.all([
+    resolveCategory(roomId, payload.categoryId),
+    resolvePayMethod(roomId, payload.payMethodId),
+    getMemberMap(roomId)
+  ])
   const now = new Date().toISOString()
 
   // 账户：记账必须能让余额对得上，支出从账户扣、收入进账户、转账两边动
-  const account = await accounts.requireAccount(roomId, payload.accountId)
+  const account = await resolveDefaultOrAccount(roomId, payload.accountId)
   const toAccount =
     type === 'transfer' ? await accounts.requireAccount(roomId, payload.toAccountId) : null
   if (!account) throw badRequest('请选择入账账户')
@@ -92,10 +125,18 @@ async function add({ openid, payload }) {
     throw badRequest('转出与转入账户不能相同')
   }
 
+  const requestedUserId = payload.userId || payload.handlerId || ''
+  const targetMember = (requestedUserId && memberMap.get(String(requestedUserId))) || memberMap.get(String(user.id)) || null
+  const entryUserId = targetMember ? targetMember.userId : user.id
+  const creatorNickname = (targetMember && targetMember.nickname) || user.nickname || ''
+  const creatorAvatar = (targetMember && targetMember.avatar) || user.avatar || ''
+
   const entry = {
     _id: nextId('led'),
     roomId,
-    userId: user.id,
+    userId: entryUserId,
+    creatorNickname,
+    creatorAvatar,
     type,
     amountMinor,
     categoryId: category ? category._id : '',
@@ -111,6 +152,8 @@ async function add({ openid, payload }) {
     note: optionalString(payload.note || payload.remark, 200),
     merchant: optionalString(payload.merchant, 60),
     merchantKey: optionalString(payload.merchantKey, 60),
+    taskId: optionalString(payload.taskId, 60),
+    listId: optionalString(payload.listId, 60),
     occurredAt: payload.occurredAt || payload.date || now,
     source: 'manual',
     deleted: false,
@@ -141,7 +184,7 @@ async function add({ openid, payload }) {
 
   await publishFeed({
     roomId,
-    userId: user.id,
+    userId: entryUserId,
     type: FEED_TYPES.LEDGER_ADD,
     content: feedContent,
     refType: 'ledger',
@@ -155,27 +198,33 @@ async function add({ openid, payload }) {
     }
   })
 
-  return shapeEntry(entry)
+  return shapeEntry(entry, memberMap)
 }
 
 async function detail({ openid, payload, query }) {
   const roomId = roomIdOf(payload, query)
   const { user, member } = await requireMembership(openid, roomId, 'viewer')
   const id = payload.id || query.id
-  const entry = await getById(COLLECTIONS.ledgers, id)
+  const [entry, memberMap] = await Promise.all([
+    getById(COLLECTIONS.ledgers, id),
+    getMemberMap(roomId)
+  ])
   if (!entry || entry.roomId !== roomId) throw notFound('流水不存在')
 
   // 只有创建者本人和 owner/admin 能改删，其他人进详情页只是只读浏览。
   // 权限由服务端判定后下发给前端，前端只负责展示，不做可信校验。
   const canOperate = entry.userId === user.id || ['owner', 'admin'].includes(member.role)
-  return { ...shapeEntry(entry), canEdit: canOperate, canDelete: canOperate }
+  return { ...shapeEntry(entry, memberMap), canEdit: canOperate, canDelete: canOperate }
 }
 
 async function edit({ openid, payload }) {
   const roomId = roomIdOf(payload)
   const { user, member } = await requireMembership(openid, roomId, 'member')
   const id = payload.id
-  const entry = await getById(COLLECTIONS.ledgers, id)
+  const [entry, memberMap] = await Promise.all([
+    getById(COLLECTIONS.ledgers, id),
+    getMemberMap(roomId)
+  ])
   if (!entry || entry.roomId !== roomId) throw notFound('流水不存在')
   if (entry.userId !== user.id && !['owner', 'admin'].includes(member.role)) {
     throw badRequest('只能修改自己记录的流水')
@@ -207,7 +256,7 @@ async function edit({ openid, payload }) {
   }
 
   if (payload.accountId !== undefined) {
-    const account = await accounts.requireAccount(roomId, payload.accountId)
+    const account = await resolveDefaultOrAccount(roomId, payload.accountId)
     patch.accountId = account ? account._id : ''
     patch.accountName = account ? account.name : ''
   }
@@ -219,6 +268,21 @@ async function edit({ openid, payload }) {
   if (payload.participants !== undefined) {
     patch.participants = Array.isArray(payload.participants) ? payload.participants : []
   }
+  if (payload.taskId !== undefined) {
+    patch.taskId = optionalString(payload.taskId, 60)
+  }
+  if (payload.listId !== undefined) {
+    patch.listId = optionalString(payload.listId, 60)
+  }
+  if (payload.userId !== undefined || payload.handlerId !== undefined) {
+    const reqUid = payload.userId || payload.handlerId
+    const targetMember = reqUid && memberMap.get(String(reqUid))
+    if (targetMember) {
+      patch.userId = targetMember.userId
+      patch.creatorNickname = targetMember.nickname || ''
+      patch.creatorAvatar = targetMember.avatar || ''
+    }
+  }
 
   await update(COLLECTIONS.ledgers, id, patch)
 
@@ -226,7 +290,7 @@ async function edit({ openid, payload }) {
   const nextEntry = { ...entry, ...patch }
   await accounts.reapplyDeltas(roomId, entry, nextEntry)
 
-  return shapeEntry(nextEntry)
+  return shapeEntry(nextEntry, memberMap)
 }
 
 async function remove({ openid, payload, query }) {
@@ -247,43 +311,79 @@ async function remove({ openid, payload, query }) {
   return { id, deleted: true }
 }
 
+function normalizeBoundStart(val) {
+  if (!val) return ''
+  const str = String(val).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split('-').map(Number)
+    return cnDayStart(y, m, d).toISOString()
+  }
+  return str
+}
+
+function normalizeBoundEnd(val) {
+  if (!val) return ''
+  const str = String(val).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split('-').map(Number)
+    return cnDayEnd(y, m, d).toISOString()
+  }
+  return str
+}
+
 /** 通用列表：按区间 + 类型 + 分类过滤，支持分页。 */
-async function list({ openid, payload, query }) {
+async function list({ openid, payload = {}, query = {} }) {
   const roomId = roomIdOf(payload, query)
   await requireMembership(openid, roomId, 'viewer')
 
+  const type = payload.type || query.type
+  const categoryId = payload.categoryId || query.categoryId
+  const taskId = payload.taskId || query.taskId || payload.linkTaskId || query.linkTaskId
+  const startDate = normalizeBoundStart(payload.startDate || query.startDate)
+  const endDate = normalizeBoundEnd(payload.endDate || query.endDate)
+
   const where = { roomId, deleted: NOT_DELETED }
-  if (payload.type && payload.type !== 'all') where.type = payload.type
-  if (payload.categoryId) where.categoryId = payload.categoryId
-  if (payload.startDate && payload.endDate) {
-    where.occurredAt = _.gte(payload.startDate).and(_.lte(payload.endDate))
+  if (type && type !== 'all') where.type = type
+  if (categoryId) where.categoryId = categoryId
+  if (taskId) where.taskId = taskId
+  if (startDate && endDate) {
+    where.occurredAt = _.gte(startDate).and(_.lte(endDate))
   }
 
-  const result = await pageQuery(COLLECTIONS.ledgers, where, {
-    page: toInt(payload.page, 1),
-    pageSize: toInt(payload.pageSize, 20),
-    orderBy: 'occurredAt',
-    order: 'desc'
-  })
+  const [result, memberMap] = await Promise.all([
+    pageQuery(COLLECTIONS.ledgers, where, {
+      page: toInt(payload.page || query.page, 1),
+      pageSize: toInt(payload.pageSize || query.pageSize, 20),
+      orderBy: 'occurredAt',
+      order: 'desc'
+    }),
+    getMemberMap(roomId)
+  ])
 
-  return { ...result, list: result.list.map(shapeEntry) }
+  return { ...result, list: result.list.map((entry) => shapeEntry(entry, memberMap)) }
 }
 
 /** 区间明细 + 汇总，week/today/month/year 共用。 */
-async function rangeView(openid, roomId, range, accountId = '') {
+async function rangeView(openid, roomId, range, accountId = '', taskId = '') {
   const { user, member } = await requireMembership(openid, roomId, 'viewer')
-  const rows = await listAll(
-    COLLECTIONS.ledgers,
-    { roomId, deleted: NOT_DELETED, occurredAt: _.gte(range.start).and(_.lte(range.end)) },
-    { orderBy: 'occurredAt', order: 'desc' }
-  )
+  const [rows, memberMap] = await Promise.all([
+    listAll(
+      COLLECTIONS.ledgers,
+      { roomId, deleted: NOT_DELETED, occurredAt: _.gte(range.start).and(_.lte(range.end)) },
+      { orderBy: 'occurredAt', order: 'desc' }
+    ),
+    getMemberMap(roomId)
+  ])
 
   // 从资产页点单个账户进来时，只该看到这个账户相关的流水（转出算一次、转入也算）
-  const entries = accountId
+  let entries = accountId
     ? rows.filter((item) => item.accountId === accountId || item.toAccountId === accountId)
     : rows
+  if (taskId) {
+    entries = entries.filter((item) => String(item.taskId || '') === String(taskId))
+  }
 
-  const shaped = entries.map(shapeEntry)
+  const shaped = entries.map((entry) => shapeEntry(entry, memberMap))
   const summary = summarize(entries)
   const groups = groupByDay(shaped)
   return {
@@ -332,19 +432,42 @@ function groupByDay(entries) {
   }))
 }
 
-const accountIdOf = (payload = {}, query = {}) => payload.accountId || query.accountId || ''
+const accountIdOf = (payload = {}, query = {}) => {
+  const raw = payload.accountId || query.accountId || ''
+  return raw && String(raw) !== '0' && String(raw) !== 'undefined' && String(raw) !== 'null' ? String(raw) : ''
+}
+const taskIdOf = (payload = {}, query = {}) =>
+  payload.taskId || query.taskId || payload.linkTaskId || query.linkTaskId || ''
 
-const week = ({ openid, payload, query }) =>
-  rangeView(openid, roomIdOf(payload, query), weekRange(payload.date), accountIdOf(payload, query))
-const today = ({ openid, payload, query }) =>
-  rangeView(openid, roomIdOf(payload, query), dayRange(payload.date), accountIdOf(payload, query))
-const month = ({ openid, payload, query }) =>
-  rangeView(openid, roomIdOf(payload, query), monthRange(payload.year, payload.month), accountIdOf(payload, query))
+const week = ({ openid, payload = {}, query = {} }) =>
+  rangeView(
+    openid,
+    roomIdOf(payload, query),
+    weekRange(payload.date || query.date),
+    accountIdOf(payload, query),
+    taskIdOf(payload, query)
+  )
+const today = ({ openid, payload = {}, query = {} }) =>
+  rangeView(
+    openid,
+    roomIdOf(payload, query),
+    dayRange(payload.date || query.date),
+    accountIdOf(payload, query),
+    taskIdOf(payload, query)
+  )
+const month = ({ openid, payload = {}, query = {} }) =>
+  rangeView(
+    openid,
+    roomIdOf(payload, query),
+    monthRange(payload.year || query.year, payload.month || query.month),
+    accountIdOf(payload, query),
+    taskIdOf(payload, query)
+  )
 /**
  * 自定义区间：起止日期都按北京时间整天算（含结束日当天到 23:59:59.999）。
  * 前端传的是 YYYY-MM-DD。
  */
-const customRange = ({ openid, payload, query }) => {
+const customRange = ({ openid, payload = {}, query = {} }) => {
   const startDate = payload.startDate || query.startDate
   const endDate = payload.endDate || query.endDate
   if (!startDate || !endDate) throw badRequest('请选择起止日期')
@@ -358,12 +481,19 @@ const customRange = ({ openid, payload, query }) => {
     openid,
     roomIdOf(payload, query),
     { start: cnDayStart(sy, sm, sd).toISOString(), end: cnDayEnd(ey, em, ed).toISOString() },
-    accountIdOf(payload, query)
+    accountIdOf(payload, query),
+    taskIdOf(payload, query)
   )
 }
 
-const year = ({ openid, payload, query }) =>
-  rangeView(openid, roomIdOf(payload, query), yearRange(payload.year), accountIdOf(payload, query))
+const year = ({ openid, payload = {}, query = {} }) =>
+  rangeView(
+    openid,
+    roomIdOf(payload, query),
+    yearRange(payload.year || query.year),
+    accountIdOf(payload, query),
+    taskIdOf(payload, query)
+  )
 
 /** 分类列表。 */
 async function categoryList({ openid, payload, query }) {
@@ -394,12 +524,12 @@ async function categoryList({ openid, payload, query }) {
 }
 
 /** 分类树：前端账单导入改分类用，按 income/expense 分组。 */
-async function categoryTree({ openid, payload, query }) {
+async function categoryTree({ openid, payload = {}, query = {} }) {
   const roomId = roomIdOf(payload, query)
   await requireMembership(openid, roomId, 'viewer')
   const rows = await listAll(COLLECTIONS.categories, { roomId }, { orderBy: 'sort', order: 'asc' })
 
-  const type = payload.type
+  const type = payload.type || query.type
   const filtered = type ? rows.filter((item) => item.type === type) : rows
 
   const groups = new Map()
@@ -422,20 +552,112 @@ async function categoryTree({ openid, payload, query }) {
 }
 
 /** 记账卡片汇总。 */
-async function summary({ openid, payload, query }) {
+async function summary({ openid, payload = {}, query = {} }) {
   const roomId = roomIdOf(payload, query)
   await requireMembership(openid, roomId, 'viewer')
 
-  const range = payload.startDate && payload.endDate
-    ? { start: payload.startDate, end: payload.endDate }
-    : monthRange(payload.year, payload.month)
+  const startDate = normalizeBoundStart(payload.startDate || query.startDate)
+  const endDate = normalizeBoundEnd(payload.endDate || query.endDate)
+  const year = payload.year || query.year
+  const month = payload.month || query.month
 
-  const entries = await listAll(
-    COLLECTIONS.ledgers,
-    { roomId, deleted: NOT_DELETED, occurredAt: _.gte(range.start).and(_.lte(range.end)) }
-  )
+  const range = startDate && endDate
+    ? { start: startDate, end: endDate }
+    : monthRange(year, month)
 
-  return { ...summarize(entries), range }
+  const todayBounds = dayRange()
+
+  const [entries, todayEntries, room, accountsList, memberMap] = await Promise.all([
+    listAll(
+      COLLECTIONS.ledgers,
+      { roomId, deleted: NOT_DELETED, occurredAt: _.gte(range.start).and(_.lte(range.end)) }
+    ),
+    listAll(
+      COLLECTIONS.ledgers,
+      { roomId, deleted: NOT_DELETED, occurredAt: _.gte(todayBounds.start).and(_.lte(todayBounds.end)) }
+    ),
+    getById(COLLECTIONS.rooms, roomId),
+    accounts.listAccounts(roomId),
+    getMemberMap(roomId)
+  ])
+
+  const monthSum = summarize(entries)
+  const todaySum = summarize(todayEntries)
+
+  const netWorthMinor = accountsList
+    .filter((item) => item.includeInNetWorth)
+    .reduce((sum, item) => sum + (item.balanceMinor || 0), 0)
+  const netAmount = toYuan(netWorthMinor)
+
+  const roomBudgetMinor = room && typeof room.budgetMinor === 'number' ? room.budgetMinor : 0
+  const budgetYuan = roomBudgetMinor > 0 ? toYuan(roomBudgetMinor) : 3000
+
+  // 本月最大开支分类
+  const catTotals = new Map()
+  entries
+    .filter((e) => e.type === 'expense')
+    .forEach((e) => {
+      const name = e.categoryName || '其他'
+      catTotals.set(name, (catTotals.get(name) || 0) + (e.amountMinor || 0))
+    })
+  let maxCategory = ''
+  let maxCatMinor = 0
+  catTotals.forEach((minor, name) => {
+    if (minor > maxCatMinor) {
+      maxCatMinor = minor
+      maxCategory = name
+    }
+  })
+
+  // 本月贡献（按收支贡献总额计算占比）
+  const userTotals = new Map()
+  let totalContribMinor = 0
+  entries
+    .filter((e) => e.type === 'expense' || e.type === 'income')
+    .forEach((e) => {
+      const uid = String(e.userId || '')
+      if (!uid) return
+      const minor = e.amountMinor || 0
+      userTotals.set(uid, (userTotals.get(uid) || 0) + minor)
+      totalContribMinor += minor
+    })
+  let topContributor = null
+  if (totalContribMinor > 0) {
+    let topUid = ''
+    let topMinor = 0
+    userTotals.forEach((minor, uid) => {
+      if (minor > topMinor) {
+        topMinor = minor
+        topUid = uid
+      }
+    })
+    if (topUid) {
+      const m = memberMap.get(topUid)
+      const entryFallback = entries.find((e) => String(e.userId) === topUid)
+      topContributor = {
+        userId: topUid,
+        nickname: (m && m.nickname) || (entryFallback && entryFallback.creatorNickname) || '家庭成员',
+        pct: Math.round((topMinor / totalContribMinor) * 100)
+      }
+    }
+  }
+
+  return {
+    ...monthSum,
+    range,
+    total_income: monthSum.totalIncome,
+    total_expense: monthSum.totalExpense,
+    net_amount: netAmount,
+    totalBalance: netAmount,
+    today_change: todaySum.balance,
+    todayChange: todaySum.balance,
+    budget: budgetYuan,
+    budget_limit: budgetYuan,
+    max_category: maxCategory,
+    maxCategory,
+    top_contributor: topContributor,
+    topContributor
+  }
 }
 
 // ---------------- 统计分析 ----------------

@@ -135,9 +135,15 @@ const loadRooms = async () => {
     const res = await roomApi.getRoomList()
     if (res.code === 0) {
       rooms.value = res.data || []
-      // 没有当前账本时，默认选中第一个，避免「明细」页空白
-      if (!currentRoomId.value && rooms.value.length) {
+      const matched = rooms.value.find((r) => String(r.id) === String(currentRoomId.value))
+      // 没有当前账本或缓存的旧账本已失效时，默认选中第一个，避免「明细」页空白
+      if (!matched && rooms.value.length) {
         setCurrentRoom(rooms.value[0])
+      } else if (!rooms.value.length && currentRoomId.value) {
+        currentRoomId.value = ''
+        try {
+          uni.removeStorageSync(STORAGE_KEYS.CURRENT_ROOM)
+        } catch (e) {}
       }
     }
   } catch (error) {

@@ -79,6 +79,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
+import AppIcon from './AppIcon.vue';
 import { SHEET_CURVE, SHEET_OPEN_MS, playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
 import { APP_THEME_PRESETS, getStoredAppThemeId, setAppThemeId } from '@/common/themes/appTheme';
 
@@ -365,4 +366,3 @@ const onTouchEnd = () => {
 
 .done-btn:active { transform: scale(0.98); opacity: 0.9; }
 </style>
-import AppIcon from './AppIcon.vue';

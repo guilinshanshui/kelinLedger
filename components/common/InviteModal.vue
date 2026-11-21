@@ -22,7 +22,7 @@
       <view class="invite-header">
         <view class="header-main">
           <view class="room-icon-tag" :style="{ background: themeColorOpacity }">
-            <AppIcon :value="roomIcon" :size="24" :color="themeColor" />
+            <AppIcon :value="roomIcon" :size="24" :color="accentColor" />
           </view>
           <view class="title-area">
             <text class="invite-label">邀请家人共同管理</text>
@@ -74,6 +74,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
+import AppIcon from './AppIcon.vue';
 
 const { themeClass, primaryColor } = useAppTheme();
 import { playSheetOpen, playSheetClose, sheetPanelTransition } from '@/common/utils/sheetMotion.js';
@@ -262,4 +263,3 @@ const handleShare = () => {
 .animate-slide-up { animation: slideUp 0.38s cubic-bezier(0.32, 0.72, 0, 1); }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>
-import AppIcon from './AppIcon.vue';

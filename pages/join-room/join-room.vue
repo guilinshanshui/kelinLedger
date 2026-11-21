@@ -54,6 +54,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import IosNav from '../../components/nav/ios-nav.vue'
 import AppIcon from '../../components/common/AppIcon.vue'
@@ -70,6 +71,19 @@ const code = ref('')
 const focused = ref(false)
 const autoFocus = ref(true)
 const submitting = ref(false)
+
+onLoad((e) => {
+  const fromQuery = e && (e.code || e.inviteCode || e.roomInviteCode)
+  const fromStorage = uni.getStorageSync('inviteCode') || uni.getStorageSync('roomInviteCode')
+  const raw = String(fromQuery || fromStorage || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (raw) {
+    code.value = raw.slice(0, CODE_LENGTH)
+    try {
+      uni.removeStorageSync('inviteCode')
+      uni.removeStorageSync('roomInviteCode')
+    } catch (err) {}
+  }
+})
 
 const canSubmit = computed(() => code.value.length === CODE_LENGTH)
 

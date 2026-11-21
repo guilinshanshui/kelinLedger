@@ -46,7 +46,7 @@
         </picker>
       </view>
 
-      <view class="overview-stats">
+      <view v-if="isLoggedIn" class="overview-stats">
         <view class="ov-col">
           <text class="ov-label">支出</text>
           <text class="ov-value">{{ formatMoneyShort(monthSummary.expense) }}</text>
@@ -64,7 +64,7 @@
       </view>
 
       <!-- 快捷入口：三项等宽平铺，触控面积 46px -->
-      <view class="quick-row">
+      <view v-if="isLoggedIn" class="quick-row">
         <view class="quick-item" @click="goStats">
           <AppIcon name="chart-pie" :size="24" />
           <text class="quick-txt">统计分析</text>
@@ -81,7 +81,7 @@
       </view>
 
       <!-- 搜索账单：通栏输入框样式，点击进入搜索页 -->
-      <view class="search-entry" @click="goLedgerAll">
+      <view v-if="isLoggedIn" class="search-entry" @click="goLedgerAll">
         <AppIcon name="search-2" :size="18" />
         <text class="search-entry-txt">搜索账单</text>
       </view>
@@ -161,11 +161,11 @@
                 <AppIcon :value="item.categoryIcon" :size="22" />
               </view>
               <view class="recent-row-main">
-                <text class="recent-row-name">{{ item.categoryName || '未分类' }}<text v-if="item.creatorNickname" class="recent-row-user">（{{ item.creatorNickname }}）</text></text>
+                <text class="recent-row-name">{{ formatRowTitle(item) }}<text v-if="item.creatorNickname" class="recent-row-user">（{{ item.creatorNickname }}）</text></text>
                 <text v-if="item.note" class="recent-row-note">{{ item.note }}</text>
               </view>
               <text class="recent-row-amount" :class="item.type">
-                {{ item.type === 'income' ? '+' : '-' }}{{ formatMoneyShort(item.amount) }}
+                {{ item.type === 'income' ? '+' : (item.type === 'expense' ? '-' : '') }}{{ formatMoneyShort(item.amount) }}
               </text>
               </view>
 
@@ -257,7 +257,16 @@ const onMonthPick = (e) => {
   selectedYear.value = year;
   selectedMonth.value = month;
   activeSwipeId.value = null;
+  loadMonthSummary();
   loadRecentEntries();
+};
+
+const formatRowTitle = (item) => {
+  if (!item) return '未分类';
+  if (item.type === 'transfer' && item.accountName && item.toAccountName) {
+    return `${item.accountName} → ${item.toAccountName}`;
+  }
+  return item.categoryName || (item.type === 'transfer' ? '转账' : '未分类');
 };
 
 /** 读取当前选中的账本（由「账本」Tab 写入本地缓存） */
@@ -274,7 +283,7 @@ const readCurrentRoom = () => {
   currentRoom.value = { id: '', name: '默认账本' };
 };
 
-/** 拉取当前账本的本月收支 */
+/** 拉取当前账本的所选月份收支 */
 const loadMonthSummary = async () => {
   readCurrentRoom();
   if (!currentRoom.value.id) {
@@ -282,24 +291,17 @@ const loadMonthSummary = async () => {
     return;
   }
   try {
-    const res = await roomApi.getDashBoardList({ roomId: currentRoom.value.id, type: 'month' });
+    const res = await roomApi.ledgerSummary({
+      roomId: currentRoom.value.id,
+      year: selectedYear.value,
+      month: selectedMonth.value
+    });
     if (res.code === 0 && res.data) {
       monthSummary.value = {
-        expense: res.data.totalExpense || 0,
-        income: res.data.totalIncome || 0,
-        balance: res.data.balance || 0
+        expense: res.data.totalExpense ?? res.data.total_expense ?? 0,
+        income: res.data.totalIncome ?? res.data.total_income ?? 0,
+        balance: res.data.balance ?? 0
       };
-      // 本地缓存里的账本名可能是旧的（在别的设备改过名、或缓存被写脏），
-      // 服务端返回的才是权威名字，顺手校正一次，避免顶部一直显示错的名字
-      const remoteName = res.data.roomName
-      if (remoteName && remoteName !== currentRoom.value.name) {
-        currentRoom.value = { ...currentRoom.value, name: remoteName }
-        try {
-          uni.setStorageSync(STORAGE_KEYS.CURRENT_ROOM, currentRoom.value)
-        } catch (error) {
-          // 写缓存失败不影响本次展示
-        }
-      }
     }
   } catch (error) {
     console.error('[明细] 月度概览加载失败', error);
@@ -379,6 +381,7 @@ const onDeleteEntry = (item) => {
         }
         uni.showToast({ title: '已删除', icon: 'success' });
         uni.$emit('refresh_ledger_data');
+        loadMonthSummary();
         loadRecentEntries();
       } catch (error) {
         uni.hideLoading();
@@ -429,6 +432,13 @@ const loadRecentEntries = async () => {
       // 记住当前用户在账本里的身份，用来决定左滑菜单里是否出「修改 / 删除」
       currentUserId.value = res.data.currentUserId || '';
       currentUserRole.value = res.data.currentUserRole || 'viewer';
+      if (res.data.summary) {
+        monthSummary.value = {
+          expense: res.data.summary.totalExpense || 0,
+          income: res.data.summary.totalIncome || 0,
+          balance: res.data.summary.balance || 0
+        };
+      }
       recentGroups.value = res.data.groups.map((group) => {
         const d = new Date(group.date);
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -442,10 +452,14 @@ const loadRecentEntries = async () => {
           expense: group.expense || 0,
           entries: (group.list || []).map((item) => ({
             id: item.id,
+            userId: item.userId || item.createdBy || '',
+            accountId: item.accountId || '',
+            accountName: item.accountName || '',
+            toAccountName: item.toAccountName || '',
             type: item.type,
             amount: item.amount,
             categoryName: item.categoryName,
-            categoryIcon: item.categoryIcon,
+            categoryIcon: item.categoryIcon || 'mc:puzzled',
             note: item.note,
             creatorNickname: item.creatorNickname || ''
           }))
@@ -536,12 +550,19 @@ onMounted(() => {
   uni.$on('refresh_notification_count', getMessageCount);
 });
 
+const consumePendingInvite = () => {
+  if (!isLoggedIn.value) return;
+  try {
+    const code = uni.getStorageSync('inviteCode') || uni.getStorageSync('roomInviteCode');
+    if (code) {
+      uni.removeStorageSync('inviteCode');
+      uni.removeStorageSync('roomInviteCode');
+      uni.navigateTo({ url: `/pages/join-room/join-room?code=${encodeURIComponent(code)}` });
+    }
+  } catch (e) {}
+};
+
 onShow(() => {
-  // 切回明细页时刷新当前账本、月度收支与最近账单
-  loadMonthSummary();
-  loadRecentEntries();
-  // 每次回到首页都刷新铃铛未读数，避免消息中心已读后红点残留/迟滞
-  if (isLoggedIn.value) getMessageCount();
   const saved = readStoredUser();
   if (saved && !isLoggedIn.value) {
     isLoggedIn.value = true;
@@ -549,7 +570,14 @@ onShow(() => {
     roomsReady.value = false;
     loading.value = true;
     getData();
+  } else if (isLoggedIn.value) {
+    // 切回明细页时刷新当前账本、月度收支与最近账单
+    loadMonthSummary();
+    loadRecentEntries();
+    getMessageCount();
   }
+
+  consumePendingInvite();
 
   if (isLoggedIn.value && (uni.getStorageSync(CHECKLIST_REFRESH_KEY) || uni.getStorageSync(SCHEDULE_REFRESH_KEY))) {
     uni.removeStorageSync(CHECKLIST_REFRESH_KEY);
@@ -597,6 +625,31 @@ const getRoomList = async () => {
     const res = await roomApi.getRoomList();
     if (res.code === 0) {
       rooms.value = res.data || [];
+      readCurrentRoom();
+      const matched = rooms.value.find((r) => String(r.id) === String(currentRoom.value.id));
+      if (!matched && rooms.value.length > 0) {
+        const first = rooms.value[0];
+        currentRoom.value = {
+          id: first.id,
+          name: first.name,
+          avatar: first.avatar || 'mc:notebook-2'
+        };
+        try {
+          uni.setStorageSync(STORAGE_KEYS.CURRENT_ROOM, currentRoom.value);
+        } catch (e) {}
+        loadMonthSummary();
+        loadRecentEntries();
+      } else if (matched && matched.name && matched.name !== currentRoom.value.name) {
+        currentRoom.value = { ...currentRoom.value, name: matched.name };
+        try {
+          uni.setStorageSync(STORAGE_KEYS.CURRENT_ROOM, currentRoom.value);
+        } catch (e) {}
+      } else if (rooms.value.length === 0 && currentRoom.value.id) {
+        currentRoom.value = { id: '', name: '默认账本' };
+        try {
+          uni.removeStorageSync(STORAGE_KEYS.CURRENT_ROOM);
+        } catch (e) {}
+      }
     }
     const count = rooms.value?.length || 0;
     user.value.roomsCount = count;
@@ -1107,7 +1160,10 @@ const goToNotifications = () => {
   color: var(--color-income, #3E8E6E);
 }
 .recent-row-amount.expense {
-  color: var(--text-ink, #1E293B);
+  color: var(--color-expense, #C4554D);
+}
+.recent-row-amount.transfer {
+  color: var(--text-sub, #475569);
 }
 
 /* ===== 记一笔：悬浮主按钮 ===== */

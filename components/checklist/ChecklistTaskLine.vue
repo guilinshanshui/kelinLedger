@@ -129,10 +129,10 @@ function handleLedgerTap() {
       props.task && props.task.ledgerPrimaryId,
       props.task && props.task.ledgerTaskId
     )
-    if (ledgerId && props.roomId && props.accountId) {
-      uni.navigateTo({
-        url: `/pages/add-entry/add-entry?roomId=${props.roomId}&accountId=${props.accountId}&id=${ledgerId}`
-      })
+    if (ledgerId && props.roomId) {
+      let url = `/pages/add-entry/add-entry?roomId=${props.roomId}&id=${ledgerId}`
+      if (props.accountId) url += `&accountId=${props.accountId}`
+      uni.navigateTo({ url })
       return
     }
   }

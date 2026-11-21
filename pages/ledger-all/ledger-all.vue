@@ -144,7 +144,7 @@
                 :class="{ 'coach-swipe-open': isCoachTarget(group, item) }"
               >
                 <!-- 底层操作按钮 -->
-                <view class="cell-actions-back" v-if="!isLocked() && !item.isDeleted && item.status !== 'void' && activeSwipeId === getSwipeKey(group, item)">
+                <view class="cell-actions-back" v-if="!isLocked(item) && !item.isDeleted && item.status !== 'void' && activeSwipeId === getSwipeKey(group, item)">
                   <view class="swipe-btn edit" @click.stop="onEdit(item)">
                     <AppIcon name="edit-2" :size="18" color="#FFFFFF" />
                     <text class="sb-txt">修改</text>
@@ -181,7 +181,7 @@
                           <text v-if="item.creatorNickname" class="meta-user">{{ item.creatorNickname }}</text>
                         </view>
                         <text class="cell-amount" :class="item.type">
-                          {{ item.type === 'income' ? '+' : '-' }}{{ formatPrice(item.amount) }}
+                          {{ item.type === 'income' ? '+' : (item.type === 'expense' ? '-' : '') }}{{ formatPrice(item.amount) }}
                         </text>
                       </view>
                       <view class="cell-sub">
@@ -259,7 +259,7 @@
                   :class="{ 'coach-swipe-open': isCoachTarget(group, item) }"
                 >
                   <!-- 底层操作按钮 -->
-                  <view class="cell-actions-back" v-if="!isLocked() && !item.isDeleted && item.status !== 'void' && activeSwipeId === getSwipeKey(group, item)">
+                  <view class="cell-actions-back" v-if="!isLocked(item) && !item.isDeleted && item.status !== 'void' && activeSwipeId === getSwipeKey(group, item)">
                     <view class="swipe-btn edit" @click.stop="onEdit(item)">
                       <AppIcon name="edit-2" :size="18" color="#FFFFFF" />
                       <text class="sb-txt">修改</text>
@@ -295,7 +295,7 @@
                             <text v-if="item.creatorNickname" class="meta-user">{{ item.creatorNickname }}</text>
                           </view>
                           <text class="cell-amount" :class="item.type">
-                            {{ item.type === 'income' ? '+' : '-' }}{{ formatPrice(item.amount) }}
+                            {{ item.type === 'income' ? '+' : (item.type === 'expense' ? '-' : '') }}{{ formatPrice(item.amount) }}
                           </text>
                         </view>
                         <view class="cell-sub">
@@ -398,7 +398,9 @@ const formatWeekday = (dateKey) => {
 
 const normalizeLedgerItem = (item) => ({
   ...item,
-  category: item.categoryName || item.category || '未分类',
+  category: item.type === 'transfer' && item.accountName && item.toAccountName
+    ? `${item.accountName} → ${item.toAccountName}`
+    : (item.categoryName || item.category || (item.type === 'transfer' ? '转账' : '未分类')),
   entryTime: item.occurredAt || item.createTime,
   creatorNickname: item.creatorNickname || ''
 })
@@ -544,11 +546,17 @@ const readCurrentRoomId = () => {
   }
 };
 
+const linkTaskId = ref('');
+
 onLoad((e) => {
   roomId.value = e.roomId || readCurrentRoomId();
-  // 兼容历史链接里拼进去的 'undefined' / 'null' 字符串，否则会被当成真实账户过滤成空
+  // 兼容历史链接里拼进去的 'undefined' / 'null' / '0' 字符串，否则会被当成真实账户过滤成空
   const rawAccountId = e.accountId;
-  accountId.value = rawAccountId && rawAccountId !== 'undefined' && rawAccountId !== 'null' ? rawAccountId : '';
+  accountId.value = rawAccountId && rawAccountId !== 'undefined' && rawAccountId !== 'null' && String(rawAccountId) !== '0' ? rawAccountId : '';
+  if (e.linkTaskId) {
+    linkTaskId.value = String(e.linkTaskId);
+    currentPeriod.value = 'year';
+  }
   // 从「我的 · 本月记账」跳进来时直接定位到对应区间；非法值忽略，落到默认的今日
   if (e.period && periods.some((p) => p.code === e.period)) {
     currentPeriod.value = e.period;
@@ -557,20 +565,22 @@ onLoad((e) => {
 
 onMounted(() => {
   initPage();
-  uni.$on('refresh_ledger_data', () => {
-    initPage();
-  });
+  uni.$on('refresh_ledger_data', initPage);
 });
 
 onUnmounted(() => {
-  uni.$off('refresh_ledger_data');
+  uni.$off('refresh_ledger_data', initPage);
   if (coachAutoTimer) clearTimeout(coachAutoTimer);
 });
 
-const isLocked=()=>{
-	if(summaryData.value&&summaryData.value.currentUserRole==='viewer')return true;
-	return false;
-}
+const isLocked = (item) => {
+  const role = summaryData.value?.currentUserRole || 'viewer';
+  if (role === 'owner' || role === 'admin') return false;
+  if (role === 'viewer') return true;
+  if (!item) return false;
+  const uid = String(summaryData.value?.currentUserId || '');
+  return !uid || String(item.userId || item.createdBy || '') !== uid;
+};
 
 const initPage = async () => {
   isLoadingGroups.value = true;
@@ -589,7 +599,11 @@ const initPage = async () => {
   if (!roomId.value) roomId.value = readCurrentRoomId();
 
   try {
-    const params = { roomId: roomId.value, accountId: accountId.value || '' };
+    const params = {
+      roomId: roomId.value,
+      accountId: accountId.value || '',
+      ...(linkTaskId.value ? { taskId: linkTaskId.value } : {})
+    };
     // 自定义区间走 /ledger/range，其余走 week/today/month/year
     const res = currentPeriod.value === 'custom'
       ? await taskApi.getLedgerRange({ ...params, startDate: customStart.value, endDate: customEnd.value })
@@ -921,9 +935,10 @@ const goToImport = () => {
 }
 .meta-time, .meta-user { font-size: 10px; font-weight: 600; color: var(--text-faint, #CBD5E1); flex-shrink: 0; }
 .cell-amount { font-size: 16px; font-weight: 600; flex-shrink: 0; line-height: 1.2; }
-/* 明细行金额同样按语义色：收入绿、支出红 */
+/* 明细行金额同样按语义色：收入绿、支出红、转账中性深灰 */
 .income { color: var(--color-income, #3E8E6E); }
 .expense { color: var(--color-expense, #C4554D); }
+.transfer { color: var(--text-sub, #475569); }
 .cell-note-wrap {
   flex: 1;
   min-width: 0;

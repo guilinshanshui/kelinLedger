@@ -1,4 +1,9 @@
-import { formatLunarMonthDay, formatLunarDayName, getLunarPartsFromSolarDate } from './lunarDisplay.js';
+import {
+  formatLunarMonthDay,
+  formatLunarDayName,
+  getLunarPartsFromSolarDate,
+  lunarBirthdayInSolarYear
+} from './lunarDisplay.js';
 import { coalesce } from './coalesce.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -223,6 +228,20 @@ function computeSolarNextOccurrence(month, day, today = new Date()) {
   return formatYmd(occurrence);
 }
 
+function computeLunarNextOccurrence(month, day, isLeap = false, today = new Date()) {
+  if (!month || !day) return '';
+  const base = startOfDay(today);
+  const baseYmd = formatYmd(base);
+  const year = base.getFullYear();
+  for (const targetYear of [year, year + 1, year + 2]) {
+    const ymd = lunarBirthdayInSolarYear(targetYear, month, day, isLeap);
+    if (ymd && ymd >= baseYmd) {
+      return ymd;
+    }
+  }
+  return '';
+}
+
 function resolveBirthdayParts(item = {}, parsed = { date: '' }) {
   const isLunar = isLunarBirthdayRecord(item);
   const original = normalizeDateStr(
@@ -263,13 +282,15 @@ export function normalizeBirthdayMeta(item = {}, today = new Date()) {
   let nextDate = normalizeDateStr(item.nextOccurrenceDate || item.next_occurrence_date);
   if (!nextDate) {
     nextDate = isLunar
-      ? normalizeDateStr(parsed.date)
+      ? (computeLunarNextOccurrence(birthdayMonth, birthdayDay, birthdayLeapMonth, today) || normalizeDateStr(parsed.date))
       : computeSolarNextOccurrence(birthdayMonth, birthdayDay, today);
   }
 
-  const nextOccurrence = startOfDay(new Date(nextDate));
+  const nextOccurrence = nextDate ? startOfDay(new Date(nextDate)) : null;
   const todayStart = startOfDay(today);
-  const daysLeft = Math.round((nextOccurrence - todayStart) / 86400000);
+  const daysLeft = nextOccurrence && !isNaN(nextOccurrence.getTime())
+    ? Math.round((nextOccurrence - todayStart) / 86400000)
+    : -1;
 
   const lunarText = isLunar
     ? formatLunarMonthDay(birthdayMonth, birthdayDay, birthdayLeapMonth)
@@ -292,11 +313,19 @@ export function normalizeBirthdayMeta(item = {}, today = new Date()) {
 
 export function getBirthdayUpcomingMeta(birthday, selectedDateStr) {
   const selected = startOfDay(new Date(selectedDateStr));
-  const nextDate = normalizeDateStr(birthday.nextDate);
-  if (!nextDate || isNaN(selected.getTime())) return null;
+  if (isNaN(selected.getTime())) return null;
+
+  let nextDate = normalizeDateStr(birthday.nextDate);
+  if (birthday.birthdayMonth && birthday.birthdayDay) {
+    const computedNext = birthday.isLunar
+      ? computeLunarNextOccurrence(birthday.birthdayMonth, birthday.birthdayDay, birthday.birthdayLeapMonth, selected)
+      : computeSolarNextOccurrence(birthday.birthdayMonth, birthday.birthdayDay, selected);
+    if (computedNext) nextDate = computedNext;
+  }
+  if (!nextDate) return null;
 
   const occurrence = startOfDay(new Date(nextDate));
-  if (occurrence.getTime() === selected.getTime()) return null;
+  if (isNaN(occurrence.getTime()) || occurrence.getTime() === selected.getTime()) return null;
 
   if (occurrence > selected) {
     return {
@@ -319,5 +348,13 @@ export function getBirthdayUpcomingMeta(birthday, selectedDateStr) {
 }
 
 export function isBirthdayOnDate(birthday, dateStr) {
-  return normalizeDateStr(birthday.nextDate) === normalizeDateStr(dateStr);
+  const target = normalizeDateStr(dateStr);
+  if (!target) return false;
+  if (normalizeDateStr(birthday.nextDate) === target) return true;
+  const parts = parseDateParts(target);
+  if (!parts.year || !birthday.birthdayMonth || !birthday.birthdayDay) return false;
+  if (birthday.isLunar) {
+    return lunarBirthdayInSolarYear(parts.year, birthday.birthdayMonth, birthday.birthdayDay, birthday.birthdayLeapMonth) === target;
+  }
+  return parts.month === Number(birthday.birthdayMonth) && parts.day === Number(birthday.birthdayDay);
 }

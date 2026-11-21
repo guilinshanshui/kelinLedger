@@ -1,6 +1,6 @@
 const { COLLECTIONS, listAll, _ } = require('./db')
 const { toYuan } = require('./money')
-const { monthRange } = require('./dates')
+const { monthRange, cnParts } = require('./dates')
 
 /**
  * 分摊结算。
@@ -83,8 +83,8 @@ async function settlement(roomId, { startDate, endDate, month } = {}) {
     const [y, m] = String(month).split('-').map(Number)
     range = monthRange(y, m)
   } else {
-    const now = new Date()
-    range = monthRange(now.getFullYear(), now.getMonth() + 1)
+    const { year, month: m } = cnParts(new Date())
+    range = monthRange(year, m)
   }
 
   const [members, entries] = await Promise.all([

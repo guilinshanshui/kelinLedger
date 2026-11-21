@@ -222,8 +222,8 @@
                   <text class="h-meta">{{ h.timeLabel }}</text>
                 </view>
               </view>
-              <text class="h-amount" :class="{ positive: h.type === 'income' }">
-                {{ h.type === 'expense' ? '-' : '+' }}{{ formatMoney(h.amount) }}
+              <text class="h-amount" :class="{ positive: h.type === 'income', transfer: h.type === 'transfer' }">
+                {{ h.type === 'expense' ? '-' : (h.type === 'income' ? '+' : '') }}{{ formatMoney(h.amount) }}
               </text>
             </view>
           </view>
@@ -247,7 +247,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 
 const { themeClass, primaryColor, softColor, expenseColor, incomeColor, theme } = useAppTheme()
@@ -258,6 +258,7 @@ import { onLoad } from "@dcloudio/uni-app";
 import IosNav from '../../components/nav/ios-nav.vue';
 import AppIcon from '../../components/common/AppIcon.vue';
 import { roomApi } from '../../common/api';
+import { STORAGE_KEYS } from '../../common/config';
 import { formatSmartTime, formatMoney } from '../../pages/js/utils.js';
 import { coalesce } from '@/common/utils/coalesce.js';
 import { goBackSafe } from '@/common/utils/nav.js'
@@ -279,6 +280,12 @@ const rangeLabel = ref(rangeOptions[0]);
 
 onLoad((e) => { 
   roomId.value = e.roomId; 
+  if (!roomId.value) {
+    try {
+      const saved = uni.getStorageSync(STORAGE_KEYS.CURRENT_ROOM);
+      roomId.value = (saved && saved.id) || '';
+    } catch (err) {}
+  }
   accountId.value = e.accountId;
   // 从「我的 · 本月支出」跳进来时直接落在本月（rangeOptions 下标：week=0 / month=1）
   const rangeIndex = { week: 0, month: 1 }[e.range];
@@ -287,7 +294,13 @@ onLoad((e) => {
     rangeLabel.value = rangeOptions[rangeIndex];
   }
 });
-onMounted(() => { getAllList(); });
+onMounted(() => {
+  getAllList();
+  uni.$on('refresh_ledger_data', getAllList);
+});
+onUnmounted(() => {
+  uni.$off('refresh_ledger_data', getAllList);
+});
 
 const getAllList = async () => {
   isLoading.value = true;
@@ -418,11 +431,15 @@ const assetRows = computed(() => {
 
 /** 最近变动明细：把后端字段搬成模板好用的形状。 */
 const historyRows = computed(() =>
-  (overView.value?.recent?.ledgers || []).map((item) => ({
-    ...item,
-    title: item.note || item.categoryName || '未分类',
-    timeLabel: `${formatSmartTime(item.occurredAt)} · ${item.categoryName || '未分类'}`
-  }))
+  (overView.value?.recent?.ledgers || []).map((item) => {
+    const cat = item.categoryName || item.category || (item.type === 'transfer' ? '转账' : '未分类');
+    const hasDistinctNote = Boolean(item.note && item.note !== cat);
+    return {
+      ...item,
+      title: item.note || cat,
+      timeLabel: hasDistinctNote ? `${formatSmartTime(item.occurredAt)} · ${cat}` : formatSmartTime(item.occurredAt)
+    };
+  })
 );
 
 const goBack = () => goBackSafe();
@@ -540,8 +557,8 @@ const toLedgerAll = () => uni.navigateTo({
 .expense { color: var(--color-expense, #C4554D); }
 
 .badge-txt { font-size: 15px; font-weight: 600; }
-.up .badge-txt { color: var(--color-expense, #C4554D); }
-.down .badge-txt { color: var(--color-income, #3E8E6E); }
+.up .badge-txt { color: var(--color-income, #3E8E6E); }
+.down .badge-txt { color: var(--color-expense, #C4554D); }
 
 /* 图表容器 */
 .content-card {
@@ -860,8 +877,9 @@ const toLedgerAll = () => uni.navigateTo({
 .h-info { display: flex; flex-direction: column; }
 .h-name { font-size: 14px; font-weight: 600; color: var(--text-ink, #334155); }
 .h-meta { font-size: 10px; font-weight: 600; color: var(--text-faint, #CBD5E1); }
-.h-amount { font-size: 15px; font-weight: 600; color: var(--text-ink, #1E293B); }
+.h-amount { font-size: 15px; font-weight: 600; color: var(--color-expense, #C4554D); }
 .positive { color: var(--color-income, #3E8E6E); }
+.transfer { color: var(--text-sub, #475569); }
 
 .animate-fade-in { animation: fadeIn 0.6s ease-out; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

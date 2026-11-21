@@ -54,6 +54,7 @@
 </template>
 
 <script setup>
+import { getCurrentInstance } from 'vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 const { themeClass, primaryColor, softColor, theme } = useAppTheme()
 
@@ -66,23 +67,31 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['leftClick', 'rightClick', 'homeClick']);
+const instance = getCurrentInstance();
+
+const hasListener = (eventName) => {
+  const vnodeProps = instance?.vnode?.props || {};
+  const propKey = `on${eventName.charAt(0).toUpperCase()}${eventName.slice(1)}`;
+  return typeof vnodeProps[propKey] === 'function' || Array.isArray(vnodeProps[propKey]);
+};
 
 const handleHomeClick = () => {
-  if (emit('homeClick')) {
+  if (hasListener('homeClick')) {
     emit('homeClick');
   } else {
-    // 默认回首页逻辑
-    uni.reLaunch({ url: '/pages/index/index' });
+    uni.switchTab({ url: '/pages/home/home' });
   }
 };
 
-const handleBack=()=>{
-	if(emit('leftClick')){
-		emit('leftClick')
-	}else{
-		// uni.navigateBack();
-	}
-}
+const handleBack = () => {
+  if (hasListener('leftClick')) {
+    emit('leftClick');
+  } else {
+    uni.navigateBack({
+      fail: () => uni.switchTab({ url: '/pages/home/home' })
+    });
+  }
+};
 
 </script>
 

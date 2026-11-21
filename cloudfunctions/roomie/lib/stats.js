@@ -1,7 +1,7 @@
 const { COLLECTIONS, listAll, _ } = require('./db')
 const { badRequest } = require('./errors')
 const { toYuan } = require('./money')
-const { monthRange, yearRange, dayKey } = require('./dates')
+const { monthRange, yearRange, dayKey, cnParts, cnDayStart, cnDayEnd, enumerateDays } = require('./dates')
 
 /**
  * 统计分析。
@@ -17,16 +17,23 @@ const { monthRange, yearRange, dayKey } = require('./dates')
 
 const MAX_CUSTOM_DAYS = 366
 
+function parseCnYmd(value) {
+  const str = String(value || '').trim()
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(str)
+  if (m) {
+    return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) }
+  }
+  return cnParts(value)
+}
+
 function startOfDayIso(value) {
-  const d = new Date(value)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
+  const { year, month, day } = parseCnYmd(value)
+  return cnDayStart(year, month, day).toISOString()
 }
 
 function endOfDayIso(value) {
-  const d = new Date(value)
-  d.setHours(23, 59, 59, 999)
-  return d.toISOString()
+  const { year, month, day } = parseCnYmd(value)
+  return cnDayEnd(year, month, day).toISOString()
 }
 
 const daysBetween = (start, end) =>
@@ -37,20 +44,20 @@ const daysBetween = (start, end) =>
  * 自定义范围做 12 个月上限校验，避免一次拉爆全表。
  */
 function normalizeRange(input = {}) {
-  const now = new Date()
+  const { year: cnYear, month: cnMonth } = cnParts(new Date())
   const rangeType = ['month', 'year', 'all', 'custom'].includes(input.rangeType)
     ? input.rangeType
     : 'month'
 
   if (rangeType === 'month') {
-    const year = Number(input.year) || now.getFullYear()
-    const month = Number(input.month) || now.getMonth() + 1
+    const year = Number(input.year) || cnYear
+    const month = Number(input.month) || cnMonth
     const range = monthRange(year, month)
     return { type: 'month', year, month, label: `${year} 年 ${month} 月`, ...range }
   }
 
   if (rangeType === 'year') {
-    const year = Number(input.year) || now.getFullYear()
+    const year = Number(input.year) || cnYear
     const range = yearRange(year)
     return { type: 'year', year, label: `${year} 年`, ...range }
   }
@@ -85,7 +92,8 @@ function pickGranularity(range, entryCount) {
 }
 
 function bucketKey(iso, granularity) {
-  return granularity === 'day' ? dayKey(iso) : String(iso).slice(0, 7)
+  const dk = dayKey(iso)
+  return granularity === 'day' ? dk : dk.slice(0, 7)
 }
 
 /**
@@ -107,23 +115,20 @@ function buildBuckets(range, granularity, entries) {
   if (!start || !end) return keys
 
   if (granularity === 'day') {
-    const cursor = new Date(start)
-    cursor.setHours(0, 0, 0, 0)
-    const last = new Date(end)
-    while (cursor <= last) {
-      keys.push(dayKey(cursor))
-      cursor.setDate(cursor.getDate() + 1)
-    }
-    return keys
+    return enumerateDays(start, end)
   }
 
-  const cursor = new Date(start)
-  cursor.setDate(1)
-  cursor.setHours(0, 0, 0, 0)
-  const last = new Date(end)
-  while (cursor <= last) {
-    keys.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`)
-    cursor.setMonth(cursor.getMonth() + 1)
+  const startParts = cnParts(start)
+  const endParts = cnParts(end)
+  let y = startParts.year
+  let m = startParts.month
+  while (y < endParts.year || (y === endParts.year && m <= endParts.month)) {
+    keys.push(`${y}-${String(m).padStart(2, '0')}`)
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
   }
   return keys
 }

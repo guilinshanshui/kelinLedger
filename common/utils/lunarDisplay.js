@@ -186,3 +186,55 @@ export function formatLunarDayShort(dateStr) {
   const lunar = solarToLunar(year, month, day);
   return formatLunarDayName(lunar.day);
 }
+
+/**
+ * 农历 -> 公历 Date。
+ * 若当年无该闰月则自动退回对应平月，若当月仅 29 天而生日为 30 则取当月最后一天。
+ */
+export function lunarToSolar(lunarYear, month, day, isLeap = false) {
+  if (lunarYear < 1900 || lunarYear >= 2100) return null;
+  const m = Number(month);
+  const d = Number(day);
+  if (!m || !d || m < 1 || m > 12 || d < 1 || d > 30) return null;
+
+  let offset = 0;
+  for (let y = 1900; y < lunarYear; y++) offset += lunarYearDays(y);
+
+  const leap = leapMonth(lunarYear);
+  const effectiveLeap = Boolean(isLeap && leap === m);
+  let placed = false;
+
+  for (let i = 1; i <= 12; i++) {
+    if (leap > 0 && i === leap + 1 && !placed) {
+      const lDays = leapDays(lunarYear);
+      if (effectiveLeap && m === leap) {
+        offset += Math.min(d, lDays) - 1;
+        return new Date(1900, 0, 31 + offset);
+      }
+      offset += lDays;
+      placed = true;
+      i--;
+      continue;
+    }
+    const mDays = monthDays(lunarYear, i);
+    if (i === m && !effectiveLeap) {
+      offset += Math.min(d, mDays) - 1;
+      return new Date(1900, 0, 31 + offset);
+    }
+    offset += mDays;
+  }
+  return null;
+}
+
+/** 农历生日在指定公历年份里的公历日期（YYYY-MM-DD） */
+export function lunarBirthdayInSolarYear(solarYear, month, day, isLeap = false) {
+  const pad2 = (n) => String(n).padStart(2, '0');
+  for (const ly of [solarYear - 1, solarYear, solarYear + 1]) {
+    const solar = lunarToSolar(ly, month, day, isLeap);
+    if (!solar) continue;
+    if (solar.getFullYear() === solarYear) {
+      return `${solar.getFullYear()}-${pad2(solar.getMonth() + 1)}-${pad2(solar.getDate())}`;
+    }
+  }
+  return '';
+}

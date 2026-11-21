@@ -130,25 +130,27 @@ function lunarToSolar(lunarYear, month, day, isLeap = false) {
   for (let y = MIN_YEAR; y < lunarYear; y++) offset += lunarYearDays(y)
 
   const leap = leapMonth(lunarYear)
+  const effectiveLeap = Boolean(isLeap && leap === m)
   let placed = false
   for (let i = 1; i <= 12; i++) {
     if (leap > 0 && i === leap + 1 && !placed) {
+      const lDays = leapDays(lunarYear)
       // 闰月插在原月之后
-      if (isLeap && m === leap) {
-        offset += d - 1
+      if (effectiveLeap && m === leap) {
+        offset += Math.min(d, lDays) - 1
         return new Date(BASE_DATE + offset * 86400000)
       }
-      offset += leapDays(lunarYear)
+      offset += lDays
       placed = true
       i--
       continue
     }
-    if (i === m) {
-      if (isLeap && leap !== m) return null
-      offset += d - 1
+    const mDays = monthDays(lunarYear, i)
+    if (i === m && !effectiveLeap) {
+      offset += Math.min(d, mDays) - 1
       return new Date(BASE_DATE + offset * 86400000)
     }
-    offset += monthDays(lunarYear, i)
+    offset += mDays
   }
   return null
 }
