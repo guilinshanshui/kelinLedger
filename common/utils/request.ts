@@ -128,11 +128,15 @@ class HttpRequest {
 
     if (result.code === 401) {
       this.handleAuthError(result.message)
-      throw new Error(result.message || '登录已过期')
+      const err: any = new Error(result.message || '登录已过期')
+      err.__handled = true
+      throw err
     }
 
     if (showError) this.toast(result.message || '请求失败')
-    throw new Error(result.message || '请求失败')
+    const err: any = new Error(result.message || '请求失败')
+    err.__handled = true
+    throw err
   }
 
   private async send<T>(
@@ -148,8 +152,10 @@ class HttpRequest {
     try {
       const result = await callCloud<T>({ action, payload, query })
       return this.unwrap(result, showError, allowBusinessCode)
-    } catch (error) {
-      if (showError) this.toast(error instanceof Error ? error.message : '网络连接失败')
+    } catch (error: any) {
+      if (showError && !error?.__handled) {
+        this.toast(error instanceof Error ? error.message : '网络连接失败')
+      }
       throw error instanceof Error ? error : new Error('网络连接失败')
     } finally {
       if (showLoading) this.hideLoading()
@@ -228,7 +234,7 @@ class HttpRequest {
     if (showLoading) this.showLoading('上传中...')
 
     try {
-      const fileID = await uploadToCloud(filePath)
+      const fileID = await uploadToCloud(filePath, 'uploads', String(formData.filename || ''))
       const { action, query } = splitUrl(url)
       const result = await callCloud<T>({
         action,
@@ -236,9 +242,9 @@ class HttpRequest {
         query
       })
       return this.unwrap(result, showError)
-    } catch (error) {
+    } catch (error: any) {
       const message = error instanceof Error ? error.message : '文件上传失败'
-      if (showError) this.toast(message)
+      if (showError && !error?.__handled) this.toast(message)
       throw new Error(message)
     } finally {
       if (showLoading) this.hideLoading()

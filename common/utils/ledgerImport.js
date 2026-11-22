@@ -43,7 +43,7 @@ export function toEditableRow(raw = {}, index = 0) {
   const categoryId = raw.categoryId || ''
   const payMethodId = raw.payMethodId || ''
   const categorySource = categoryId ? (raw.remembered ? 'remembered' : 'fallback') : ''
-  const needsReview = !categoryId
+  const needsReview = !raw.duplicate && !categoryId
 
   return {
     ...raw,

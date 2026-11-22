@@ -265,6 +265,7 @@ import AppIcon from '../../components/common/AppIcon.vue'
 import CategoryPicker from '../../components/common/CategoryPicker.vue'
 import BottomPicker from '../../components/common/BottomPicker.vue'
 import { assetApi, ledgerImportApi, taskApi } from '../../common/api'
+import { STORAGE_KEYS } from '../../common/config'
 import { coalesce } from '../../common/utils/coalesce.js'
 import { useAppTheme } from '@/common/themes/useAppTheme.js'
 import { formatDate, formatPrice } from '../../pages/js/utils.js'
@@ -347,7 +348,7 @@ const canPreview = computed(() => !!selectedFilePath.value && roomId.value && ac
 
 const filteredRows = computed(() => {
   const rows = editableRows.value || []
-  if (listFilter.value === 'review') return rows.filter((r) => r.needsReview)
+  if (listFilter.value === 'review') return rows.filter((r) => r.status !== 'duplicate' && r.needsReview)
   if (listFilter.value === 'duplicate') return rows.filter((r) => r.status === 'duplicate')
   return rows
 })
@@ -356,9 +357,22 @@ const selectedCount = computed(() =>
   editableRows.value.filter((r) => r.selected && r.status === 'importable').length
 )
 
+const sanitizeParam = (val) => {
+  const text = String(val == null ? '' : val).trim()
+  if (!text || text === '0' || text === 'undefined' || text === 'null') return ''
+  return text
+}
+
 onLoad((e) => {
-  roomId.value = e.roomId
-  accountId.value = e.accountId
+  let rid = sanitizeParam(e && e.roomId)
+  if (!rid) {
+    try {
+      const saved = uni.getStorageSync(STORAGE_KEYS.CURRENT_ROOM)
+      rid = (saved && saved.id) || ''
+    } catch (err) {}
+  }
+  roomId.value = rid
+  accountId.value = sanitizeParam(e && e.accountId)
 })
 
 onMounted(() => {
@@ -445,7 +459,8 @@ const runPreview = async () => {
     const res = await ledgerImportApi.preview(
       selectedFilePath.value,
       roomId.value,
-      accountId.value
+      accountId.value,
+      selectedFileName.value
     )
     if (res.code !== 0) {
       uni.showToast({ title: getApiMessage(res), icon: 'none', duration: 3000 })
@@ -602,7 +617,7 @@ const runConfirm = async () => {
     importResult.value = {
       ...result,
       imported: result.success || 0,
-      duplicate: 0,
+      duplicate: previewMeta.value.duplicate || 0,
       skipped: result.skipped || 0,
       failed: result.failed || 0,
       message: result.failed ? `成功导入 ${result.success || 0} 条，失败 ${result.failed} 条` : `已成功导入 ${result.success || 0} 条记录`

@@ -528,11 +528,20 @@ onMounted(() => {
     getData();
   }
   uni.$on('refresh_room_data', (data) => {
-    if (data) {
-      const roomId = Number(data.roomId);
-      const room = rooms.value.find((r) => r.id === roomId);
-      if (!room) return;
-      room.name = data.roomName;
+    if (data && data.roomId) {
+      const targetId = String(data.roomId);
+      const room = rooms.value.find((r) => String(r.id) === targetId);
+      if (room && data.roomName) {
+        room.name = data.roomName;
+      }
+      if (data.roomName) {
+        try {
+          const saved = uni.getStorageSync(STORAGE_KEYS.CURRENT_ROOM);
+          if (saved && String(saved.id) === targetId) {
+            uni.setStorageSync(STORAGE_KEYS.CURRENT_ROOM, { ...saved, name: data.roomName });
+          }
+        } catch (err) {}
+      }
     } else {
       getRoomList();
     }

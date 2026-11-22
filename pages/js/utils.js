@@ -13,15 +13,32 @@ export function countDay(dividend, divisor) {
 	const quotient = dividend / divisor;
 	return quotient.toFixed(2); // 保留两位小数
 }
+/** 兼容 iOS JSC：把 'YYYY-MM-DD HH:mm:ss' 空格分隔日期转为斜杠分隔再解析。 */
+function parseDateSafe(input) {
+  if (input instanceof Date) return input
+  if (typeof input === 'string') {
+    const text = input.trim()
+    if (!text) return new Date(NaN)
+    if (/^\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}/.test(text)) {
+      return new Date(text.replace(/-/g, '/'))
+    }
+    return new Date(text)
+  }
+  const ts = Number(input)
+  if (Number.isNaN(ts)) return new Date(NaN)
+  return new Date(ts < 1e12 && ts > 0 ? ts * 1000 : ts)
+}
+
 /**
  * 格式化时间戳为：今日 14:30 / 昨日 18:20 / 11月15日
- * @param {number} timestamp 毫秒时间戳
+ * @param {number|string|Date} timestamp 毫秒时间戳或日期字符串
  */
 export function formatSmartTime(timestamp) {
   if (!timestamp) return ''
 
   const now = new Date()
-  const date = new Date(timestamp)
+  const date = parseDateSafe(timestamp)
+  if (Number.isNaN(date.getTime())) return ''
 
   const startOfToday = new Date(
     now.getFullYear(),
@@ -190,16 +207,7 @@ export function formatDate(timestamp, format = 'yyyy-MM-dd') {
     return '';
   }
 
-  let date;
-
-  if (timestamp instanceof Date) {
-    date = timestamp;
-  } else if (typeof timestamp === 'string') {
-    date = new Date(timestamp);
-  } else {
-    const ts = Number(timestamp);
-    date = new Date(ts < 1e12 ? ts * 1000 : ts);
-  }
+  const date = parseDateSafe(timestamp);
 
   if (isNaN(date.getTime())) return '';
 

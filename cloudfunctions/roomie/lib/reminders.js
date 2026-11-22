@@ -167,7 +167,7 @@ function buildMessage(schedule, candidate) {
     title: '日程提醒',
     body: offset === 0
       ? `今天有日程「${title}」`
-      : `「${title}」${whenText}（${candidate.remindDate}）`,
+      : `「${title}」${whenText}（${candidate.occurrence}）`,
     targetType: 'schedule',
     targetDate: candidate.occurrence
   }

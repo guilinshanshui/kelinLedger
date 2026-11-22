@@ -68,7 +68,7 @@
           
           <view class="mode-toggle-btn" @click="toggleLoginMode">
             <view class="toggle-icon-bg">
-              <AppIcon :value="loginMode === 'wechat' ? 'mc:wechat' : 'mc:cellphone'" :size="18" />
+              <AppIcon :value="loginMode === 'wechat' ? 'mc:cellphone' : 'mc:wechat'" :size="18" />
             </view>
             <text class="t-label">{{ loginMode === 'wechat' ? '账号密码登录' : '返回微信一键登录' }}</text>
           </view>
@@ -135,11 +135,11 @@ onLoad((e)=>{
 
 const credentials = reactive({ account: '', password: '' });
 
-// 增加：返回上一级逻辑
+// 增加：返回上一级逻辑（无上一页时切回首页 tab，避免 reLaunch index 陷入循环）
 const goBack = () => {
   uni.navigateBack({
     fail: () => {
-      uni.reLaunch({ url: '/pages/index/index' });
+      uni.switchTab({ url: '/pages/home/home' });
     }
   });
 };

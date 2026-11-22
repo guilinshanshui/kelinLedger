@@ -112,6 +112,19 @@ async function updateProfile({ openid, payload }) {
   if (payload.phone !== undefined) patch.phone = optionalString(payload.phone, 20)
 
   await update(COLLECTIONS.users, user._id, patch)
+
+  // 同步更新各房间成员表里的昵称与头像快照，避免任务/统计页读到旧值
+  const memberPatch = {}
+  if (patch.nickname !== undefined) memberPatch.nickname = patch.nickname
+  if (patch.avatar !== undefined) memberPatch.avatar = patch.avatar
+  if (Object.keys(memberPatch).length) {
+    memberPatch.updatedAt = patch.updatedAt
+    const memberships = await listAll(COLLECTIONS.members, { userId: user.id, status: 'active' })
+    await Promise.all(
+      memberships.map((m) => update(COLLECTIONS.members, m._id, memberPatch))
+    )
+  }
+
   // 资料完善发生在登录态落库之前，这里一并下发 token，前端保存后可直接进入应用。
   const next = { ...user, ...patch }
   return { ...toClientUser(next), token: issueToken(next) }
@@ -160,7 +173,7 @@ async function statsInfo({ openid, payload, query }) {
 
   const [ledgerRows, taskCount] = await Promise.all([
     listAll(COLLECTIONS.ledgers, ledgerWhere),
-    count(COLLECTIONS.tasks, { roomId: roomFilter })
+    count(COLLECTIONS.tasks, { roomId: roomFilter, deleted: _.neq(true) })
   ])
 
   const memberCount = await count(COLLECTIONS.members, {

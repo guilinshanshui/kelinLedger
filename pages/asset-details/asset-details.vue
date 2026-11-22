@@ -214,7 +214,7 @@
                   <AppIcon
                     :value="h.categoryIcon || 'mc:receive-money'"
                     :size="20"
-                    :color="h.type === 'income' ? incomeColor : expenseColor"
+                    :color="h.type === 'income' ? incomeColor : (h.type === 'transfer' ? '#475569' : expenseColor)"
                   />
                 </view>
                 <view class="h-info">

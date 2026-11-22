@@ -86,7 +86,11 @@ export async function callCloud<T = any>({
  * 上传文件到云存储，返回 fileID。
  * 账单导入等场景把 fileID 交给云函数读取。
  */
-export async function uploadToCloud(filePath: string, folder = 'uploads'): Promise<string> {
+export async function uploadToCloud(
+  filePath: string,
+  folder = 'uploads',
+  filename = ''
+): Promise<string> {
   if (!isCloudAvailable()) {
     throw new Error('当前环境不支持云存储上传')
   }
@@ -94,8 +98,8 @@ export async function uploadToCloud(filePath: string, folder = 'uploads'): Promi
   initCloud()
 
   // 微信头像选择器 / 相册返回的临时路径可能是 wxfile://tmp_xxx（没有扩展名），
-  // 直接拼 '.' 会生成带 :// 的非法 cloudPath，真机上传会失败，这里只接尾部合法扩展名。
-  const matched = /\.([a-zA-Z0-9]{1,5})$/.exec(filePath)
+  // 优先从传入的 filename 取扩展名，其次从 filePath 取尾部合法扩展名。
+  const matched = /\.([a-zA-Z0-9]{1,5})$/.exec(filename) || /\.([a-zA-Z0-9]{1,5})$/.exec(filePath)
   const ext = (matched ? matched[1] : 'png').toLowerCase()
   const cloudPath = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`
   const res = await wx.cloud.uploadFile({ cloudPath, filePath })

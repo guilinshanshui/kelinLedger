@@ -1,5 +1,5 @@
 const cloud = require('wx-server-sdk')
-const { COLLECTIONS, insert, update, getOne, listAll } = require('../lib/db')
+const { COLLECTIONS, insert, update, getOne, listAll, _ } = require('../lib/db')
 const { nextId } = require('../lib/id')
 const { requireMembership } = require('../lib/context')
 const { badRequest } = require('../lib/errors')
@@ -69,8 +69,21 @@ function findHeaderRow(rows) {
   return -1
 }
 
-function decodeBuffer(buffer, filename = '') {
-  if (filename.toLowerCase().endsWith('.xlsx')) return { kind: 'xlsx', buffer }
+function isZipBuffer(buffer) {
+  return Buffer.isBuffer(buffer)
+    && buffer.length >= 4
+    && buffer[0] === 0x50
+    && buffer[1] === 0x4b
+    && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07)
+    && (buffer[3] === 0x04 || buffer[3] === 0x06 || buffer[3] === 0x08)
+}
+
+function decodeBuffer(buffer, filename = '', fileID = '') {
+  const lowerName = String(filename || '').toLowerCase()
+  const lowerFileId = String(fileID || '').toLowerCase()
+  if (lowerName.endsWith('.xlsx') || lowerFileId.endsWith('.xlsx') || isZipBuffer(buffer)) {
+    return { kind: 'xlsx', buffer }
+  }
 
   // 优先按 UTF-8 解码；若出现替换字符且存在 iconv，则回退 GBK
   const utf8 = buffer.toString('utf8')
@@ -143,10 +156,11 @@ function rowsFromXlsx(buffer) {
 
 /** 判断收支方向。 */
 function resolveDirection(flowText, amountText) {
-  const text = String(flowText || '')
+  const text = String(flowText || '').trim()
+  // 先拦截「不计收支 / 中性交易 / /」：因为「不计收支」含「收」字，不能放在后面
+  if (text.includes('不计收支') || text.includes('中性交易') || text === '/' || text === '-') return 'skip'
   if (text.includes('收入') || text.includes('收')) return 'income'
   if (text.includes('支出') || text.includes('支')) return 'expense'
-  if (text.includes('不计收支')) return 'skip'
   // 无法判断时按金额符号推断
   const amount = Number(String(amountText).replace(/[^\d.-]/g, ''))
   return amount < 0 ? 'expense' : 'income'
@@ -190,7 +204,7 @@ async function importPreview({ openid, payload }) {
   const buffer = download.fileContent
   const filename = payload.filename || ''
 
-  const decoded = decodeBuffer(buffer, filename)
+  const decoded = decodeBuffer(buffer, filename, fileID)
   const rows = decoded.kind === 'xlsx' ? rowsFromXlsx(buffer) : parseCsv(decoded.text)
 
   if (!rows.length) throw badRequest('文件内容为空')
@@ -234,7 +248,7 @@ async function importPreview({ openid, payload }) {
   if (!parsed.length) throw badRequest('未能从文件中解析出有效交易记录')
 
   // 已入库的交易单号，用于标记重复
-  const existing = await listAll(COLLECTIONS.ledgers, { roomId, deleted: false })
+  const existing = await listAll(COLLECTIONS.ledgers, { roomId, deleted: _.neq(true) })
   const existingKeys = new Set(
     existing.map((item) => (item.tradeNo ? `no:${item.tradeNo}` : `sig:${item.occurredAt}|${item.amountMinor}|${item.merchant}`))
   )

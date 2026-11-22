@@ -173,12 +173,22 @@ export const ledgerImportApi = {
   preview: (
     filePath: string,
     roomId: string | number,
-    accountId: string | number = ''
+    accountId: string | number = '',
+    filename = ''
   ): Promise<ApiResponse<Record<string, any>>> =>
-    http.upload(API_PATHS.LEDGER_IMPORT_PREVIEW, filePath, { roomId: String(roomId), accountId: String(accountId) }, {
-      showLoading: true,
-      showError: false
-    }),
+    http.upload(
+      API_PATHS.LEDGER_IMPORT_PREVIEW,
+      filePath,
+      {
+        roomId: String(roomId),
+        accountId: String(accountId || ''),
+        ...(filename ? { filename: String(filename) } : {})
+      },
+      {
+        showLoading: true,
+        showError: false
+      }
+    ),
 
   /** 确认导入勾选的行 */
   confirm: (data: Record<string, any>): Promise<ApiResponse<Record<string, any>>> =>

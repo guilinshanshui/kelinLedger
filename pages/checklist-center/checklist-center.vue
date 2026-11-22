@@ -278,7 +278,8 @@ const timeFilters = [
 
 onLoad((e) => {
   roomId.value = e.roomId
-  accountId.value = e.accountId
+  const rawAcc = String(e.accountId == null ? '' : e.accountId).trim()
+  accountId.value = (!rawAcc || rawAcc === '0' || rawAcc === 'undefined' || rawAcc === 'null') ? '' : rawAcc
 })
 
 onShow(async () => {
@@ -529,7 +530,7 @@ async function handleActionTransfer() {
 
 async function onTransferPick(item) {
   if (!actionTask.value?.id || !item?.id) return
-  const res = await taskApi.assignTask(String(actionTask.value.id), String(item.id))
+  const res = await taskApi.assignTask(String(actionTask.value.id), String(item.id), roomId.value)
   if (res.code == 0) {
     uni.showToast({ title: '已转交', icon: 'success' })
     markChecklistDirty()
@@ -584,7 +585,7 @@ function handleActionRestore() {
   closeActionSheet()
   if (!task?.id) return
   uni.showLoading({ title: '恢复中...' })
-  taskApi.resetTask(task.id)
+  taskApi.resetTask(task.id, roomId.value)
     .then(async (res) => {
       if (res.code == 0) {
         uni.showToast({ title: '已恢复为待办', icon: 'success' })
@@ -671,7 +672,7 @@ async function onCompleteTask(task) {
   if (completingId.value === task.id || task.isCompleted) return
   completingId.value = task.id
   completePhase.value = 'sweep'
-  const apiPromise = taskApi.complateTask(task.id).catch(() => ({ code: -1 }))
+  const apiPromise = taskApi.complateTask(task.id, roomId.value).catch(() => ({ code: -1 }))
   await waitMs(COMPLETE_SWEEP_MS)
   if (completingId.value !== task.id) return
   completePhase.value = 'done'
@@ -699,7 +700,8 @@ async function onCompleteTask(task) {
 function goToAddEntryFromTask(task) {
   const target = task || actionTask.value || drawerInitialTask.value
   if (!target?.id) return
-  let url = `/pages/add-entry/add-entry?roomId=${roomId.value}&accountId=${accountId.value}&taskId=${target.id}`
+  let url = `/pages/add-entry/add-entry?roomId=${roomId.value}&taskId=${target.id}`
+  if (accountId.value) url += `&accountId=${accountId.value}`
   const title = target.title || target.note
   if (title) url += `&note=${encodeURIComponent(title)}`
   uni.navigateTo({ url })

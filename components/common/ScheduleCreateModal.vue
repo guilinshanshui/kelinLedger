@@ -446,11 +446,13 @@ const wechatChannelSelected = computed(() =>
 const remindPreviewText = computed(() =>
   buildRemindPreview({
     type: form.type === 'daily' ? 'daily' : 'birthday',
-    date: form.birthdayCalendar === 'solar' ? solarPickerDate.value : '',
+    date: form.type === 'daily'
+      ? pickerDate.value
+      : (form.birthdayCalendar === 'solar' ? solarPickerDate.value : ''),
     remindTime: form.remindTime,
     remindOffsets: form.remindOffsets,
     remindEnabled: form.remindEnabled,
-    isLunar: form.birthdayCalendar === 'lunar'
+    isLunar: form.type === 'birthday' && form.birthdayCalendar === 'lunar'
   })
 );
 
@@ -529,6 +531,9 @@ const resetCreateForm = () => {
     birthdayCache.lunarDay = 0;
     birthdayCache.lunarLeapMonth = false;
   } else {
+    form.birthdayCalendar = 'solar';
+    form.isLunar = false;
+    form.birthdayLeapMonth = false;
     form.date = clampDateToToday(props.initialDate);
   }
 };

@@ -102,8 +102,9 @@ const isSwiping = ref(false)
 const dragY = ref(0)
 let startY = 0
 
-const YEARS = 150
-const BASE_YEAR = 1970
+const YEARS = 200
+const BASE_YEAR = 1920
+const MAX_YEAR = BASE_YEAR + YEARS - 1
 
 const years = Array.from({ length: YEARS }, (_, i) => BASE_YEAR + i)
 
@@ -116,9 +117,9 @@ const parseDate = (str) => {
 }
 
 const clampDate = (y, m, d) => {
-  let yy = y
-  let mm = m
-  let dd = d
+  let yy = Math.min(MAX_YEAR, Math.max(BASE_YEAR, y))
+  let mm = Math.min(12, Math.max(1, m))
+  let dd = Math.max(1, d)
   if (props.start) {
     const s = parseDate(props.start)
     if (s && (yy < s.y || (yy === s.y && mm < s.m) || (yy === s.y && mm === s.m && dd < s.d))) {

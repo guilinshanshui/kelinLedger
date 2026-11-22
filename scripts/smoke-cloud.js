@@ -708,6 +708,119 @@ async function main() {
     /^\d{4}-\d{2}-\d{2}$/.test(lunarBday.nextOccurrenceDate),
     lunarBday.nextOccurrenceDate)
 
+  console.log('\n[21] 第二轮回归：账单导入/动态分页/提醒文案/账户删除/资料同步')
+  // 1) 账单导入：不计收支 & 中性交易跳过，且历史缺省 deleted 字段也能判重
+  const sampleCsv = [
+    '微信支付账单明细',
+    '交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号',
+    '2026-05-01 10:00:00,商户消费,瑞幸咖啡,拿铁,支出,¥19.90,零钱,支付成功,TN_EXP_1',
+    '2026-05-01 11:00:00,转账,余额宝,转入,不计收支,¥500.00,零钱,支付成功,TN_SKIP_1',
+    '2026-05-01 11:30:00,信用卡还款,招商银行,还款,中性交易,¥1000.00,零钱,支付成功,TN_SKIP_2',
+    '2026-05-01 12:00:00,微信红包,家人,红包,收入,¥88.00,零钱,已存入零钱,TN_INC_1'
+  ].join('\n')
+  const origDownload = fakeSdk.downloadFile
+  fakeSdk.downloadFile = async () => ({ fileContent: Buffer.from(sampleCsv, 'utf8') })
+  // 写入一条历史格式流水（无 deleted 字段），验证去重能识别
+  table('ledger_entries').push({
+    _id: 'led_legacy_dedupe',
+    roomId: importRoom.id,
+    tradeNo: 'TN_EXP_1',
+    type: 'expense',
+    amountMinor: 1990,
+    occurredAt: '2026-05-01T02:00:00.000Z'
+  })
+  const csvPreview = await callOk('/ledger/import/preview', {
+    roomId: importRoom.id,
+    accountId: importAccount.id,
+    fileID: 'cloud://test/bill.csv'
+  }, {}, 'openid_a')
+  check('账单导入跳过「不计收支 / 中性交易」不误记为收入',
+    csvPreview.total === 2 && csvPreview.rows.every((r) => r.tradeNo !== 'TN_SKIP_1' && r.tradeNo !== 'TN_SKIP_2'),
+    JSON.stringify(csvPreview.rows.map((r) => ({ tn: r.tradeNo, type: r.type }))))
+  check('账单导入去重能识别缺少 deleted 字段的历史流水',
+    csvPreview.duplicates === 1 && csvPreview.rows.some((r) => r.tradeNo === 'TN_EXP_1' && r.duplicate === true),
+    JSON.stringify({ duplicates: csvPreview.duplicates }))
+
+  // 验证 ZIP 魔数即使不传 filename 也能识别为 xlsx（不会走 CSV 报「未能识别账单表头」）
+  fakeSdk.downloadFile = async () => ({ fileContent: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]) })
+  const xlsxProbe = await callExpectFailure('/ledger/import/preview', {
+    roomId: importRoom.id,
+    accountId: importAccount.id,
+    fileID: 'cloud://test/tmp_no_ext.png'
+  }, {}, 'openid_a')
+  check('ZIP 魔数无扩展名仍识别为 xlsx 而非按 CSV 解析',
+    !String(xlsxProbe.message || '').includes('未能识别账单表头'),
+    xlsxProbe.message)
+  fakeSdk.downloadFile = origDownload
+
+  // 2) 家庭动态 GET 分页 + 头像临时链接换取
+  const feedRoom = await callOk('/room/createRoom', { name: '动态分页空间' }, {}, 'openid_a')
+  await callOk('/user/update', { nickname: '新昵称A', avatar: 'cloud://env/avatar_a.png' }, {}, 'openid_a')
+  const syncedMembers = table('room_members').filter((m) => m.userId === userA.id && m.status === 'active')
+  check('修改个人资料同步更新成员表昵称与头像快照',
+    syncedMembers.length > 0 && syncedMembers.every((m) => m.nickname === '新昵称A' && m.avatar === 'cloud://env/avatar_a.png'))
+
+  await callOk('/feed/create', { roomId: feedRoom.id, content: '动态第一条' }, {}, 'openid_a')
+  await callOk('/feed/create', { roomId: feedRoom.id, content: '动态第二条' }, {}, 'openid_a')
+  const origGetTempUrl = fakeSdk.getTempFileURL
+  fakeSdk.getTempFileURL = async ({ fileList }) => ({
+    fileList: fileList.map((fileID) => ({ fileID, tempFileURL: `https://temp.example/${encodeURIComponent(fileID)}` }))
+  })
+  const feedP1 = await callOk('/feed/list', {}, { roomId: feedRoom.id, page: 1, pageSize: 1 }, 'openid_a')
+  const feedP2 = await callOk('/feed/list', {}, { roomId: feedRoom.id, page: 2, pageSize: 1 }, 'openid_a')
+  fakeSdk.getTempFileURL = origGetTempUrl
+  check('家庭动态 GET 分页返回不同页数据',
+    feedP1.list.length === 1 && feedP2.list.length === 1 && feedP1.list[0].id !== feedP2.list[0].id,
+    JSON.stringify({ p1: feedP1.list[0] && feedP1.list[0].id, p2: feedP2.list[0] && feedP2.list[0].id }))
+  check('家庭动态将 cloud:// 作者头像换取为临时链接',
+    String(feedP1.list[0].authorAvatar || '').startsWith('https://temp.example/'),
+    feedP1.list[0].authorAvatar)
+
+  // 3) 提前日程提醒文案应展示日程发生日而非提醒当天
+  const remindersLib = require(path.join(__dirname, '..', 'cloudfunctions', 'roomie', 'lib', 'reminders.js'))
+  const advSchedule = await callOk('/schedule/add', {
+    roomId: feedRoom.id,
+    title: '年度体检',
+    scheduleType: 'schedule',
+    date: '2026-06-10',
+    remindEnabled: true,
+    remindTime: '09:00',
+    remindOffsets: [-3]
+  }, {}, 'openid_a')
+  await remindersLib.generateDue(new Date('2026-06-07T01:30:00.000Z'), { roomId: feedRoom.id })
+  const advNotif = table('notifications').find((n) => n.targetId === advSchedule.id && n.type === 'schedule_reminder')
+  check('提前提醒日程文案展示日程发生日 2026-06-10 而非提醒当天',
+    !!advNotif && advNotif.body.includes('2026-06-10') && !advNotif.body.includes('2026-06-07'),
+    advNotif && advNotif.body)
+
+  // 4) 删除账户校验转账转入引用（toAccountId）
+  const accRoom = await callOk('/room/createRoom', { name: '账户删除校验空间' }, {}, 'openid_a')
+  const accList = await callOk('/ledger/account/list', {}, { roomId: accRoom.id }, 'openid_a')
+  const accFrom = accList[0]
+  const accTo = accList[1]
+  await callOk('/ledger/add', {
+    roomId: accRoom.id,
+    type: 'transfer',
+    amount: 200,
+    accountId: accFrom.id,
+    toAccountId: accTo.id,
+    note: '转入测试'
+  }, {}, 'openid_a')
+  const delToRes = await callExpectFailure('/ledger/account/delete', {
+    roomId: accRoom.id,
+    id: accTo.id
+  }, {}, 'openid_a')
+  check('作为转账转入方的账户不允许被删除', delToRes.code === 409, `code=${delToRes.code}`)
+
+  // 5) user.statsInfo 任务数排除已软删除任务
+  const statsTask = await callOk('/task/add', { roomId: accRoom.id, title: '临时任务' }, {}, 'openid_a')
+  const statsBefore = await callOk('/user/statsInfo', {}, { roomId: accRoom.id }, 'openid_a')
+  await callOk('/task/delete', { roomId: accRoom.id, id: statsTask.id }, {}, 'openid_a')
+  const statsAfter = await callOk('/user/statsInfo', {}, { roomId: accRoom.id }, 'openid_a')
+  check('user.statsInfo 任务统计排除已软删除任务',
+    statsBefore.taskCount === 1 && statsAfter.taskCount === 0,
+    JSON.stringify({ before: statsBefore.taskCount, after: statsAfter.taskCount }))
+
   // ---------- 汇总 ----------
   console.log('='.repeat(56))
   console.log(`通过 ${passed} 项，失败 ${failures.length} 项`)

@@ -90,10 +90,7 @@ const maskLayerStyle = computed(() => ({
 
 const panelTransform = ref({ transform: 'translateY(100%)', transition: 'none' });
 
-const panelStyle = computed(() => ({
-  ...panelTransform.value,
-  transform: `translateY(${modalTranslateY.value}px)`
-}));
+const panelStyle = computed(() => panelTransform.value);
 
 watch(() => props.modelValue, (newVal) => {
   if (newVal) {

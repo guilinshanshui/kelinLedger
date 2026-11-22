@@ -85,7 +85,7 @@
  * （见 cloudfunctions/lib/activity.js），所以这里只做「读取 + 点赞」，
  * 空态要说清楚"怎么才会有动态"，而不是干摆一片白。
  */
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import AppIcon from '../common/AppIcon.vue'
 import UserAvatar from '../common/UserAvatar.vue'
 import { feedApi } from '@/common/api'
@@ -236,7 +236,26 @@ const previewImage = (images, index) => {
   uni.previewImage({ urls: images, current: images[index] })
 }
 
-onMounted(() => loadFeed())
+const onActivityChanged = () => {
+  page.value = 1
+  hasMore.value = false
+  loadFeed(false)
+}
+
+onMounted(() => {
+  loadFeed()
+  uni.$on('refresh_ledger_data', onActivityChanged)
+  uni.$on('checklist_board_refresh', onActivityChanged)
+  uni.$on('schedule_board_refresh', onActivityChanged)
+  uni.$on('task_ledger_refresh', onActivityChanged)
+})
+
+onUnmounted(() => {
+  uni.$off('refresh_ledger_data', onActivityChanged)
+  uni.$off('checklist_board_refresh', onActivityChanged)
+  uni.$off('schedule_board_refresh', onActivityChanged)
+  uni.$off('task_ledger_refresh', onActivityChanged)
+})
 
 // 切换账本后要重新拉，否则会看到上一个空间的动态
 watch(

@@ -214,15 +214,23 @@ async function updateAccount(roomId, accountId, payload) {
   return shapeAccount({ ...account, ...patch })
 }
 
-/** 删除账户：仍有流水引用时拒绝，避免账目悬空。 */
+/** 删除账户：仍有流水引用（含转账转入）时拒绝，避免账目悬空。 */
 async function deleteAccount(roomId, accountId) {
   const account = await requireAccount(roomId, accountId)
 
-  const used = await count(COLLECTIONS.ledgers, {
-    roomId,
-    deleted: _.neq(true),
-    accountId
-  })
+  const [usedFrom, usedTo] = await Promise.all([
+    count(COLLECTIONS.ledgers, {
+      roomId,
+      deleted: _.neq(true),
+      accountId
+    }),
+    count(COLLECTIONS.ledgers, {
+      roomId,
+      deleted: _.neq(true),
+      toAccountId: accountId
+    })
+  ])
+  const used = usedFrom + usedTo
   if (used > 0) {
     throw conflict(`该账户下还有 ${used} 笔流水，请先转移或删除后再试`)
   }

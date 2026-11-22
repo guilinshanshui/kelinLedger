@@ -1,3 +1,4 @@
+const cloud = require('wx-server-sdk')
 const {
   COLLECTIONS,
   insert,
@@ -26,16 +27,38 @@ const TYPE_LABEL = {
   member_join: '新成员'
 }
 
+async function resolveCloudUrls(fileIDs) {
+  const unique = [...new Set(fileIDs.filter((v) => /^cloud:\/\//.test(String(v || ''))))]
+  if (!unique.length || typeof cloud.getTempFileURL !== 'function') return new Map()
+  try {
+    const res = await cloud.getTempFileURL({ fileList: unique })
+    return new Map(
+      (res.fileList || [])
+        .filter((item) => item && item.tempFileURL)
+        .map((item) => [item.fileID, item.tempFileURL])
+    )
+  } catch (error) {
+    console.warn('[feed] 头像临时链接生成失败', error && (error.errMsg || error.message))
+    return new Map()
+  }
+}
+
 async function enrich(feeds, viewerId, viewerRole = '') {
   const userIds = Array.from(new Set(feeds.map((item) => item.userId).filter(Boolean)))
   const users = await Promise.all(userIds.map((id) => getById(COLLECTIONS.users, id)))
   const userMap = new Map(users.filter(Boolean).map((user) => [user.id || user._id, user]))
+
+  const avatarUrlMap = await resolveCloudUrls(
+    users.filter(Boolean).map((user) => user.avatar).filter(Boolean)
+  )
 
   // 创建者本人和管理员可以清除动态，其他人只能看
   const canDeleteAny = ['owner', 'admin'].includes(viewerRole)
   return feeds.map((item) => {
     const author = userMap.get(item.userId)
     const authorName = (author && author.nickname) || item.authorName || '成员'
+    const rawAvatar = (author && author.avatar) || ''
+    const authorAvatar = avatarUrlMap.get(rawAvatar) || rawAvatar
     // 旧动态把作者昵称写在了正文里，卡片上方已单独展示作者，这里去掉重复前缀，
     // 让新老记录读起来一致（新记录本身已不带昵称）。
     let content = item.content || ''
@@ -47,7 +70,7 @@ async function enrich(feeds, viewerId, viewerRole = '') {
       roomId: item.roomId,
       userId: item.userId,
       authorName,
-      authorAvatar: (author && author.avatar) || '',
+      authorAvatar,
       type: item.type,
       typeLabel: TYPE_LABEL[item.type] || '动态',
       content,
@@ -64,7 +87,7 @@ async function enrich(feeds, viewerId, viewerRole = '') {
 }
 
 /** 动态流，倒序。 */
-async function list({ openid, payload, query }) {
+async function list({ openid, payload = {}, query = {} }) {
   const roomId = roomIdOf(payload, query)
   const { user, member } = await requireMembership(openid, roomId, 'viewer')
 
@@ -72,8 +95,8 @@ async function list({ openid, payload, query }) {
     COLLECTIONS.feeds,
     { roomId, deleted: NOT_DELETED },
     {
-      page: toInt(payload.page, 1),
-      pageSize: toInt(payload.pageSize, 20),
+      page: toInt(payload.page !== undefined ? payload.page : query.page, 1),
+      pageSize: toInt(payload.pageSize !== undefined ? payload.pageSize : query.pageSize, 20),
       orderBy: 'createdAt',
       order: 'desc'
     }

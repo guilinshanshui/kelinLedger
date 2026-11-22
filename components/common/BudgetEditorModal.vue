@@ -14,7 +14,7 @@
           type="digit" 
           class="main-budget-input" 
           placeholder="0.00" 
-          :focus="true"
+          :focus="modelValue"
           placeholder-style="color: var(--text-faint, #66788D)"
         />
       </view>

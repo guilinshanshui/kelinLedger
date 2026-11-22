@@ -253,7 +253,15 @@ const onProfileSaved = (saved) => {
  * 所以每次 onShow 都重新按当前账本取一次。
  */
 onShow(() => {
-  if (isLoggedIn.value) getUserStatsInfo();
+  const savedUser = userStore.currentUser || uni.getStorageSync(STORAGE_KEYS.USER_INFO);
+  if (savedUser) {
+    isLoggedIn.value = true;
+    user.value = normalizeUser(savedUser);
+    getUserStatsInfo();
+  } else {
+    isLoggedIn.value = false;
+    userStatsInfo.value = null;
+  }
 });
 
 /**
@@ -372,12 +380,14 @@ const dashClick = (type) => {
 
 /** 空间看板：房间的四个功能模块（账本/清单/日程/动态）都从这里进 */
 const goToDashboard = () => {
+  if (!isLoggedIn.value) { goToLogin(); return; }
   const roomId = requireRoom();
   if (!roomId) return;
   uni.navigateTo({ url: `/pages/dashboard/dashboard?roomId=${roomId}` });
 };
 
 const goToAsset = () => {
+  if (!isLoggedIn.value) { goToLogin(); return; }
   const roomId = requireRoom();
   if (!roomId) return;
   // range=month：卡片上的金额是本月支出，进去也应该是本月
@@ -385,6 +395,7 @@ const goToAsset = () => {
 };
 
 const goToImport = () => {
+  if (!isLoggedIn.value) { goToLogin(); return; }
   const roomId = requireRoom();
   if (!roomId) return;
   uni.navigateTo({ url: `/pages/ledger-import/ledger-import?roomId=${roomId}` });
@@ -392,6 +403,7 @@ const goToImport = () => {
 
 /** 导出账单：云函数生成 CSV，写入本地后调起分享 */
 const handleExport = async () => {
+  if (!isLoggedIn.value) { goToLogin(); return; }
   const roomId = requireRoom();
   if (!roomId) return;
 
