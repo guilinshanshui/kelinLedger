@@ -20,6 +20,18 @@ const required = [
   'cloudfunctions/roomie/index.js'
 ]
 
+function walkJsFiles(dir, out = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'cloudfunctions' || entry.name === 'node_modules') continue
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) walkJsFiles(full, out)
+    else if (entry.isFile() && entry.name.endsWith('.js') && entry.name !== 'vendor.js') {
+      out.push(full)
+    }
+  }
+  return out
+}
+
 let failed = false
 for (const target of targets) {
   const absolute = path.join(root, target)
@@ -29,10 +41,19 @@ for (const target of targets) {
   }
 
   const missing = required.filter((file) => !fs.existsSync(path.join(absolute, file)))
-  if (missing.length) {
+  const es2020Hits = []
+  for (const jsFile of walkJsFiles(absolute)) {
+    const content = fs.readFileSync(jsFile, 'utf8')
+    if (/\?\?|\?\.[a-zA-Z_$([]/.test(content)) {
+      es2020Hits.push(path.relative(absolute, jsFile))
+    }
+  }
+
+  if (missing.length || es2020Hits.length) {
     failed = true
     console.log(`[失败] ${target}`)
     missing.forEach((file) => console.log(`  缺少 ${file}`))
+    es2020Hits.forEach((file) => console.log(`  包含微信上传不支持的 ?? / ?. 语法: ${file}`))
   } else {
     console.log(`[通过] ${target}`)
   }

@@ -206,6 +206,7 @@ import { SCHEDULE_REFRESH_KEY } from '../../common/utils/scheduleHomePreview.js'
 import { useUserStore } from '@/store/user';
 import { goToLogin, formatMoneyShort } from '../js/utils.js';
 import { STORAGE_KEYS } from '../../common/config';
+import { coalesce } from '@/common/utils/coalesce.js';
 
 const userStore = useUserStore();
 
@@ -298,9 +299,9 @@ const loadMonthSummary = async () => {
     });
     if (res.code === 0 && res.data) {
       monthSummary.value = {
-        expense: res.data.totalExpense ?? res.data.total_expense ?? 0,
-        income: res.data.totalIncome ?? res.data.total_income ?? 0,
-        balance: res.data.balance ?? 0
+        expense: coalesce(res.data.totalExpense, res.data.total_expense, 0),
+        income: coalesce(res.data.totalIncome, res.data.total_income, 0),
+        balance: coalesce(res.data.balance, 0)
       };
     }
   } catch (error) {

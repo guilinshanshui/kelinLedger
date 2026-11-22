@@ -270,6 +270,7 @@ import { formatRelativeTime, formatPrice, getDateStr } from '../../pages/js/util
 import BudgetEditorModal from '../common/BudgetEditorModal.vue';
 import { useAppTheme } from '@/common/themes/useAppTheme.js';
 import { withWarmup } from '@/common/utils/prefetch.js';
+import { coalesce } from '@/common/utils/coalesce.js';
 import UserAvatar from '../common/UserAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 
@@ -443,12 +444,12 @@ const getLedgersummary = async () => {
     );
     if (res.code == 0) {
       const d = res.data || {};
-      monthIncome.value = Number(d.total_income ?? d.totalIncome ?? 0);
-      monthExpense.value = Number(d.total_expense ?? d.totalExpense ?? 0);
-      budgetLimit.value = Number(d.budget_limit ?? d.budget ?? 3000);
-      totalBalance.value = Number(d.net_amount ?? d.totalBalance ?? d.balance ?? 0);
-      todayChange.value = Number(d.today_change ?? d.todayChange ?? 0);
-      maxExpenseCategory.value = d.max_category ?? d.maxCategory ?? "";
+      monthIncome.value = Number(coalesce(d.total_income, d.totalIncome, 0));
+      monthExpense.value = Number(coalesce(d.total_expense, d.totalExpense, 0));
+      budgetLimit.value = Number(coalesce(d.budget_limit, d.budget, 3000));
+      totalBalance.value = Number(coalesce(d.net_amount, d.totalBalance, d.balance, 0));
+      todayChange.value = Number(coalesce(d.today_change, d.todayChange, 0));
+      maxExpenseCategory.value = coalesce(d.max_category, d.maxCategory, "");
       const tc = d.top_contributor || d.topContributor;
       if (tc) {
         topContributor.name = tc.nickname || tc.name || "";
